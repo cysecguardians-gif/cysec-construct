@@ -14,7 +14,7 @@ The customer creates and owns the Supabase account and project. The vendor confi
 6. Configure Auth URL settings only if required by the selected login flow.
 7. Create the first administrator using the secure bootstrap process below.
 8. Configure the desktop application on each office PC with the same project URL and publishable key.
-9. Test sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, and audit/access controls.
+9. Test sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, access controls, audit logging, and login-session reporting.
 
 ## Application configuration
 
@@ -36,6 +36,7 @@ The migrations currently are:
 - `0005_invoice_security_and_helpers.sql` — invoice/payment grants, secure-invoker reporting views, and supporting indexes.
 - `0006_material_stock_threshold.sql` — configurable minimum stock quantity for low-stock monitoring and inventory controls.
 - `0007_access_control_and_audit.sql` — admin membership lookup, admin-only team management, role/access changes, and protected audit-log history.
+- `0008_login_session_tracking.sql` — secure login-session start, heartbeat/touch, logout/end operations, session-history policies, and indexes for session monitoring.
 
 The initial invoice model supports **optional discount and optional GST**. Both are disabled by default. When GST is enabled, the invoice stores CGST/SGST/IGST amounts; when disabled, GST amounts must remain zero. Monetary values are stored as integer paise, while the application displays Indian Rupee formatting (`₹`, `en-IN`).
 
@@ -64,6 +65,18 @@ The `Access & Audit` screen uses server-side security-definer functions for admi
 User creation/invitation remains an authentication-provider operation. The desktop app does not create Auth users with an elevated key. An administrator can create/invite the user through the customer's approved Supabase Auth workflow, after which the user is managed in the organization's membership list.
 
 Audit records are treated as append-only history. The migration removes direct update/delete access to audit entries. Important transactional operations and membership changes write audit entries server-side.
+
+## Login/session monitoring
+
+Migration `0008_login_session_tracking.sql` provides three authenticated RPC operations:
+
+- `start_login_session(organization_id)` — closes any previous open session for the same user and starts a new session.
+- `touch_login_session(session_id)` — updates `last_seen_at` for the current open session.
+- `end_login_session(session_id, reason)` — records logout time and an end reason.
+
+Session records are visible to the owning user and to organization Admins. The Access & Audit screen includes a **Login sessions** view showing login time, last seen time, logout time, duration, end reason, and user ID.
+
+The application should call `start_login_session` immediately after a successful sign-in, periodically call `touch_login_session` while the application is active, and call `end_login_session` during explicit sign-out. This keeps session duration reporting in the database without requiring an elevated key.
 
 ## First administrator / organization bootstrap
 
@@ -108,6 +121,7 @@ For a new customer database, run:
 0005_invoice_security_and_helpers.sql
 0006_material_stock_threshold.sql
 0007_access_control_and_audit.sql
+0008_login_session_tracking.sql
 ```
 
 Do not edit an already-applied migration for a customer. Create a new numbered migration for later schema changes.
