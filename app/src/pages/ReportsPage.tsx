@@ -7,7 +7,7 @@ const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR
 type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
 type Invoice = { id: string; invoice_number: string | null; invoice_date: string; status: string; discount_amount_paise: number; subtotal_paise: number; taxable_value_paise: number; total_gst_paise: number; grand_total_paise: number };
 type Payment = { id: string; invoice_id: string; amount_paise: number; payment_date: string; payment_method: string };
-type Movement = { id: string; material_id: string; movement_type: string; quantity: number; created_at: string; materials?: { name: string } | null };
+type Movement = { id: string; material_id: string; movement_type: string; quantity: number; created_at: string; materials?: { name: string }[] | null };
 type CustomerBalance = { customer_id: string; name: string; total_invoiced_paise: number; total_paid_paise: number; total_pending_paise: number };
 
 const today = () => new Date().toISOString().slice(0, 10);
