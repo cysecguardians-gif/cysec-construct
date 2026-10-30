@@ -1,5 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+let trackedClient: SupabaseClient | null = null;
+let trackedSessionId: string | null = null;
+
 export async function startLoginSession(supabase: SupabaseClient, organizationId: string): Promise<string | null> {
   const { data, error } = await supabase.rpc('start_login_session', {
     p_organization_id: organizationId,
@@ -10,7 +13,12 @@ export async function startLoginSession(supabase: SupabaseClient, organizationId
     return null;
   }
 
-  return typeof data === 'string' ? data : null;
+  const sessionId = typeof data === 'string' ? data : null;
+  if (sessionId) {
+    trackedClient = supabase;
+    trackedSessionId = sessionId;
+  }
+  return sessionId;
 }
 
 export async function touchLoginSession(supabase: SupabaseClient, sessionId: string): Promise<boolean> {
@@ -41,5 +49,20 @@ export async function endLoginSession(
     return false;
   }
 
+  if (trackedSessionId === sessionId) {
+    trackedClient = null;
+    trackedSessionId = null;
+  }
+
   return true;
+}
+
+export async function closeTrackedLoginSession(reason = 'session_cleanup'): Promise<boolean> {
+  const client = trackedClient;
+  const sessionId = trackedSessionId;
+  trackedClient = null;
+  trackedSessionId = null;
+
+  if (!client || !sessionId) return true;
+  return endLoginSession(client, sessionId, reason);
 }
