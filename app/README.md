@@ -7,7 +7,8 @@ The desktop client is a Tauri v2 + React + TypeScript + Vite application.
 - `src/` — React application
 - `src/lib/config.ts` — customer-owned Supabase connection settings
 - `src/lib/supabase.ts` — Supabase client factory
-- `src/App.tsx` — first-run, authentication and application shell
+- `src/pages/MaterialsPage.tsx` — materials catalog and stock operations
+- `src/App.tsx` — first-run, authentication, organization setup, and application shell
 - `src/styles.css` — application styling
 
 ## Local development
@@ -35,7 +36,25 @@ The first-run flow is:
 1. Configure the customer's Supabase project.
 2. Sign in with Supabase Auth.
 3. Check the application schema/status.
-4. If the signed-in user has no organization, create the first organization through `bootstrap_organization()`.
+4. If the signed-in user has no organization, create the first organization through `bootstrap_organization()` and initialize standard units.
 5. Enter the application shell.
 
-Business modules will be added incrementally after this foundation.
+## Current business module
+
+The first operational module is **Materials & Stock**. It supports:
+
+- Material name and description.
+- HSN/SAC code.
+- GST rate.
+- Selling price in INR.
+- Unit selection.
+- Optional category.
+- Opening stock.
+- Material activation/deactivation.
+- Search.
+- Positive or negative stock adjustments.
+- Stock changes through the transactional `adjust_stock()` database function.
+
+Stock is not silently overwritten when an adjustment is made; the database records a stock movement for the change.
+
+The next business modules will build on this foundation: customers, invoices, payments, and reporting.
