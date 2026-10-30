@@ -14,7 +14,7 @@ The customer creates and owns the Supabase account and project. The vendor confi
 6. Configure Auth URL settings only if required by the selected login flow.
 7. Create the first administrator using the secure bootstrap process below.
 8. Configure the desktop application on each office PC with the same project URL and publishable key.
-9. Test sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, and session recording.
+9. Test sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, and audit/access controls.
 
 ## Application configuration
 
@@ -32,6 +32,10 @@ The migrations currently are:
 - `0001_initial_schema.sql` — India-first INR schema covering organizations, users/memberships, login sessions, materials, stock movements, customers, invoices, invoice items, payments, audit logging, and customer balance/payment summary views.
 - `0002_transactional_operations.sql` — transactional invoice issuance, Indian financial-year invoice numbering, stock deduction/adjustment, payment recording, and invoice cancellation/stock restoration.
 - `0003_bootstrap_and_connection.sql` — secure first-organization bootstrap, schema/version connection check, and optional default-unit seeding.
+- `0004_customer_operations.sql` — controlled customer create, update, and active/inactive operations with audit handling.
+- `0005_invoice_security_and_helpers.sql` — invoice/payment grants, secure-invoker reporting views, and supporting indexes.
+- `0006_material_stock_threshold.sql` — configurable minimum stock quantity for low-stock monitoring and inventory controls.
+- `0007_access_control_and_audit.sql` — admin membership lookup, admin-only team management, role/access changes, and protected audit-log history.
 
 The initial invoice model supports **optional discount and optional GST**. Both are disabled by default. When GST is enabled, the invoice stores CGST/SGST/IGST amounts; when disabled, GST amounts must remain zero. Monetary values are stored as integer paise, while the application displays Indian Rupee formatting (`₹`, `en-IN`).
 
@@ -47,6 +51,19 @@ The desktop application should use the RPC functions in `0002_transactional_oper
 Invoice numbers use the Indian financial year format by default, such as `INV/2026-27/0001`. The organization invoice prefix is configurable.
 
 The RPC functions use `security definer` because they perform atomic multi-table operations. Each function explicitly checks the authenticated user's organization membership, and administrator-only operations additionally check the user's organization role. The service-role key is never required by the desktop client.
+
+## Admin access and audit controls
+
+The application has two organization roles:
+
+- `admin` — can manage organization users, change Staff/Admin roles, disable or restore user access, and review the audit log.
+- `staff` — can use normal operational workflows permitted by the application but cannot manage users or access the organization audit log.
+
+The `Access & Audit` screen uses server-side security-definer functions for administrator operations. The client does not query `auth.users` directly and never receives a service-role key.
+
+User creation/invitation remains an authentication-provider operation. The desktop app does not create Auth users with an elevated key. An administrator can create/invite the user through the customer's approved Supabase Auth workflow, after which the user is managed in the organization's membership list.
+
+Audit records are treated as append-only history. The migration removes direct update/delete access to audit entries. Important transactional operations and membership changes write audit entries server-side.
 
 ## First administrator / organization bootstrap
 
@@ -87,6 +104,10 @@ For a new customer database, run:
 0001_initial_schema.sql
 0002_transactional_operations.sql
 0003_bootstrap_and_connection.sql
+0004_customer_operations.sql
+0005_invoice_security_and_helpers.sql
+0006_material_stock_threshold.sql
+0007_access_control_and_audit.sql
 ```
 
 Do not edit an already-applied migration for a customer. Create a new numbered migration for later schema changes.
