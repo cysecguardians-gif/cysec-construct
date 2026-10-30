@@ -27,11 +27,25 @@ Never request or store the customer's Supabase account password, database passwo
 
 Migrations are committed to `supabase/migrations/` and have stable sequence numbers. Apply each migration once, in ascending order. Record the applied migration/version for each customer environment. Review the target project before applying a migration, and take a suitable backup before production schema changes.
 
-The first database migration is:
+The migrations currently are:
 
 - `0001_initial_schema.sql` — India-first INR schema covering organizations, users/memberships, login sessions, materials, stock movements, customers, invoices, invoice items, payments, audit logging, and customer balance/payment summary views.
+- `0002_transactional_operations.sql` — transactional invoice issuance, Indian financial-year invoice numbering, stock deduction/adjustment, payment recording, and invoice cancellation/stock restoration.
 
 The initial invoice model supports **optional discount and optional GST**. Both are disabled by default. When GST is enabled, the invoice stores CGST/SGST/IGST amounts; when disabled, GST amounts must remain zero. Monetary values are stored as integer paise, while the application displays Indian Rupee formatting (`₹`, `en-IN`).
+
+### Transactional write operations
+
+The desktop application should use the RPC functions in `0002_transactional_operations.sql` for financial and stock-changing operations rather than performing several independent writes from the frontend.
+
+- `issue_invoice(...)` — validates the customer and materials, calculates discount/GST, creates the invoice and immutable item snapshots, deducts stock, records stock movements, generates the invoice number, and writes an audit entry in one database transaction.
+- `adjust_stock(...)` — performs a controlled stock increase/decrease and creates the corresponding stock movement.
+- `record_payment(...)` — records a payment while preventing payments greater than the outstanding invoice balance.
+- `cancel_invoice(...)` — administrator-only cancellation that restores stock and preserves the invoice history instead of deleting it. Paid invoices cannot be cancelled until payments are reversed through a future payment-reversal workflow.
+
+Invoice numbers use the Indian financial year format by default, such as `INV/2026-27/0001`. The organization invoice prefix is configurable.
+
+The RPC functions use `security definer` because they perform atomic multi-table operations. Each function explicitly checks the authenticated user's organization membership, and administrator-only operations additionally check the user's organization role. The service-role key is never required by the desktop client.
 
 Apply each migration once, in ascending order. Do not edit an already-applied migration for a customer; create a new migration for later schema changes.
 
