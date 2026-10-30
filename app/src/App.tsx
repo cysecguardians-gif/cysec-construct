@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import MaterialsPage from './pages/MaterialsPage';
 import StockLedgerPage from './pages/StockLedgerPage';
@@ -10,6 +10,7 @@ import ReportsPage from './pages/ReportsPage';
 import AccessAuditPage from './pages/AccessAuditPage';
 import { clearSupabaseConfig, loadSupabaseConfig, normalizeSupabaseUrl, saveSupabaseConfig, type SupabaseConfig } from './lib/config';
 import { getSupabaseClient, resetSupabaseClient } from './lib/supabase';
+import { endLoginSession, startLoginSession, touchLoginSession } from './lib/sessionTracking';
 
 type Screen='config'|'login'|'organization'|'dashboard'|'materials'|'stock-ledger'|'customers'|'invoices'|'invoice-detail'|'payments'|'reports'|'access-audit';
 type AppStatus={ok:boolean;authenticated:boolean;schema_version?:number;currency_code?:string;locale?:string};
@@ -19,9 +20,11 @@ const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maxim
 
 export default function App(){
  const [config,setConfig]=useState<SupabaseConfig|null>(()=>loadSupabaseConfig());const [session,setSession]=useState<Session|null>(null);const [screen,setScreen]=useState<Screen>(config?'login':'config');const [error,setError]=useState('');const [statusMessage,setStatusMessage]=useState('');const [organizationId,setOrganizationId]=useState<string|null>(null);const [invoiceId,setInvoiceId]=useState<string|null>(null);const supabase=useMemo<SupabaseClient|null>(()=>config?getSupabaseClient(config):null,[config]);
- useEffect(()=>{if(!supabase)return;let mounted=true;supabase.auth.getSession().then(({data,error:e})=>{if(!mounted)return;if(e){setError(e.message);return}setSession(data.session);setScreen(data.session?'dashboard':'login')});const {data:l}=supabase.auth.onAuthStateChange((_event,s)=>{setSession(s);if(!s){setOrganizationId(null);setInvoiceId(null);setScreen('login')}});return()=>{mounted=false;l.subscription.unsubscribe()}},[supabase]);
+ const loginSessionIdRef=useRef<string|null>(null);
+ useEffect(()=>{if(!supabase)return;let mounted=true;supabase.auth.getSession().then(({data,error:e})=>{if(!mounted)return;if(e){setError(e.message);return}setSession(data.session);setScreen(data.session?'dashboard':'login')});const {data:l}=supabase.auth.onAuthStateChange((_event,s)=>{if(!s&&loginSessionIdRef.current){void endLoginSession(supabase,loginSessionIdRef.current,'auth_signed_out');loginSessionIdRef.current=null}setSession(s);if(!s){setOrganizationId(null);setInvoiceId(null);setScreen('login')}});return()=>{mounted=false;l.subscription.unsubscribe()}},[supabase]);
+ useEffect(()=>{if(!supabase||!session?.user.id||!organizationId)return;let active=true;let heartbeat:ReturnType<typeof setInterval>|null=null;(async()=>{const id=await startLoginSession(supabase,organizationId);if(!active||!id)return;loginSessionIdRef.current=id;heartbeat=setInterval(()=>{if(loginSessionIdRef.current)void touchLoginSession(supabase,loginSessionIdRef.current)},60000)})();return()=>{active=false;if(heartbeat)clearInterval(heartbeat)}},[supabase,session?.user.id,organizationId]);
  async function saveConfig(u:string,k:string){setError('');setStatusMessage('Checking Supabase connection…');const url=normalizeSupabaseUrl(u),publishableKey=k.trim();if(!/^https:\/\/[^/]+\.supabase\.co$/i.test(url)||!publishableKey){setStatusMessage('');setError('Enter a valid Supabase Project URL and publishable/anon key.');return}try{const c={url,publishableKey};await getSupabaseClient(c).auth.getSession();saveSupabaseConfig(c);setConfig(c);setScreen('login');setStatusMessage('Connection settings saved.')}catch(e){setStatusMessage('');setError(e instanceof Error?e.message:'Could not connect to Supabase.')}}
- async function signOut(){if(supabase)await supabase.auth.signOut();setSession(null);setOrganizationId(null);setInvoiceId(null);setScreen('login')}function changeConnection(){resetSupabaseClient();clearSupabaseConfig();setConfig(null);setSession(null);setOrganizationId(null);setInvoiceId(null);setScreen('config')}
+ async function signOut(){if(supabase&&loginSessionIdRef.current){const id=loginSessionIdRef.current;loginSessionIdRef.current=null;await endLoginSession(supabase,id,'logout')}if(supabase)await supabase.auth.signOut();setSession(null);setOrganizationId(null);setInvoiceId(null);setScreen('login')}function changeConnection(){resetSupabaseClient();clearSupabaseConfig();setConfig(null);setSession(null);setOrganizationId(null);setInvoiceId(null);setScreen('config')}
  if(!config||!supabase||screen==='config')return <ConfigPage onSave={saveConfig} error={error} status={statusMessage}/>;if(!session||screen==='login')return <LoginPage supabase={supabase} error={error} setError={setError}/>;if(screen==='organization')return <OrganizationSetupPage supabase={supabase} error={error} setError={setError} onComplete={id=>{setOrganizationId(id);setScreen('dashboard')}}/>;
  const shell=(children:React.ReactNode,active:string)=><AppShell active={active} onNavigate={setScreen} onSignOut={signOut} onChangeConnection={changeConnection}>{children}</AppShell>;
  if(screen==='materials'&&organizationId)return shell(<MaterialsPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'materials');
