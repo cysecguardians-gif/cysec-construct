@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import MaterialsPage from './pages/MaterialsPage';
+import StockLedgerPage from './pages/StockLedgerPage';
 import CustomersPage from './pages/CustomersPage';
 import InvoicesPage from './pages/InvoicesPage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
@@ -9,7 +10,7 @@ import ReportsPage from './pages/ReportsPage';
 import { clearSupabaseConfig, loadSupabaseConfig, normalizeSupabaseUrl, saveSupabaseConfig, type SupabaseConfig } from './lib/config';
 import { getSupabaseClient, resetSupabaseClient } from './lib/supabase';
 
-type Screen='config'|'login'|'organization'|'dashboard'|'materials'|'customers'|'invoices'|'invoice-detail'|'payments'|'reports';
+type Screen='config'|'login'|'organization'|'dashboard'|'materials'|'stock-ledger'|'customers'|'invoices'|'invoice-detail'|'payments'|'reports';
 type AppStatus={ok:boolean;authenticated:boolean;schema_version?:number;currency_code?:string;locale?:string};
 type DashboardInvoice={invoice_id:string;customer_id:string;invoice_number:string;invoice_date:string;grand_total_paise:number;pending_amount_paise:number;payment_status:string};
 type DashboardStats={materials:number;customers:number;pendingInvoices:number;pendingAmount:number;stockValue:number;recentInvoices:DashboardInvoice[]};
@@ -23,6 +24,7 @@ export default function App(){
  if(!config||!supabase||screen==='config')return <ConfigPage onSave={saveConfig} error={error} status={statusMessage}/>;if(!session||screen==='login')return <LoginPage supabase={supabase} error={error} setError={setError}/>;if(screen==='organization')return <OrganizationSetupPage supabase={supabase} error={error} setError={setError} onComplete={id=>{setOrganizationId(id);setScreen('dashboard')}}/>;
  const shell=(children:React.ReactNode,active:string)=><AppShell active={active} onNavigate={setScreen} onSignOut={signOut} onChangeConnection={changeConnection}>{children}</AppShell>;
  if(screen==='materials'&&organizationId)return shell(<MaterialsPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'materials');
+ if(screen==='stock-ledger'&&organizationId)return shell(<StockLedgerPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('materials')}/>,'materials');
  if(screen==='customers'&&organizationId)return shell(<CustomersPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'customers');
  if(screen==='invoices'&&organizationId)return shell(<InvoicesPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')} onOpenInvoice={(id)=>{setInvoiceId(id);setScreen('invoice-detail')}}/>,'invoices');
  if(screen==='invoice-detail'&&organizationId&&invoiceId)return shell(<InvoiceDetailPage supabase={supabase} organizationId={organizationId} invoiceId={invoiceId} onBack={()=>setScreen('invoices')}/>,'invoices');
