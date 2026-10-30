@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { SupabaseConfig } from './config';
+import { closeTrackedLoginSession } from './sessionTracking';
 
 let client: SupabaseClient | null = null;
 let activeConfig: SupabaseConfig | null = null;
@@ -25,6 +26,7 @@ export function getSupabaseClient(config: SupabaseConfig): SupabaseClient {
 }
 
 export function resetSupabaseClient(): void {
+  void closeTrackedLoginSession('connection_changed');
   client = null;
   activeConfig = null;
 }
