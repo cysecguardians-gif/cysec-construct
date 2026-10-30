@@ -14,7 +14,7 @@ The customer creates and owns the Supabase account and project. The vendor confi
 6. Configure Auth URL settings only if required by the selected login flow.
 7. Create the first administrator using the documented secure bootstrap process.
 8. Configure the desktop application on each office PC with the same project URL and publishable key.
-9. Test sign-in, organization isolation, stock/invoice workflows, and session recording.
+9. Test sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, and session recording.
 
 ## Application configuration
 
@@ -26,6 +26,14 @@ Never request or store the customer's Supabase account password, database passwo
 ## SQL migration policy
 
 Migrations are committed to `supabase/migrations/` and have stable sequence numbers. Apply each migration once, in ascending order. Record the applied migration/version for each customer environment. Review the target project before applying a migration, and take a suitable backup before production schema changes.
+
+The first database migration is:
+
+- `0001_initial_schema.sql` — India-first INR schema covering organizations, users/memberships, login sessions, materials, stock movements, customers, invoices, invoice items, payments, audit logging, and customer balance/payment summary views.
+
+The initial invoice model supports **optional discount and optional GST**. Both are disabled by default. When GST is enabled, the invoice stores CGST/SGST/IGST amounts; when disabled, GST amounts must remain zero. Monetary values are stored as integer paise, while the application displays Indian Rupee formatting (`₹`, `en-IN`).
+
+Apply each migration once, in ascending order. Do not edit an already-applied migration for a customer; create a new migration for later schema changes.
 
 The first release uses manual migration application. Do not add an in-app button that executes arbitrary DDL with a service-role key.
 
