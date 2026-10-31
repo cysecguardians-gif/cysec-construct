@@ -31,6 +31,53 @@ jobs:
       - name: Install Tauri CLI
         run: npm install --global @tauri-apps/cli@2
 
+      - name: Generate Windows icon
+        shell: pwsh
+        run: |
+          python - <<'PY'
+          import struct
+          import zlib
+          from pathlib import Path
+
+          out = Path('src-tauri/icons')
+          out.mkdir(parents=True, exist_ok=True)
+          size = 32
+
+          # Create a simple 32x32 PNG icon using only the Python standard library.
+          pixels = []
+          for y in range(size):
+              row = bytearray([0])
+              for x in range(size):
+                  bg = (30, 41, 59, 255)
+                  fg = (255, 255, 255, 255)
+                  on = False
+                  # A simple block-style M mark.
+                  if 8 <= x <= 23 and 9 <= y <= 23:
+                      if x in (8, 9, 22, 23) or y == 23:
+                          on = True
+                      elif y <= 15 and (x - 8 == y - 9 or x - 23 == -(y - 9)):
+                          on = True
+                  row.extend(fg if on else bg)
+              pixels.append(bytes(row))
+
+          raw = b''.join(pixels)
+
+          def chunk(kind, data):
+              return struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+
+          png = b'\x89PNG\r\n\x1a\n'
+          png += chunk(b'IHDR', struct.pack('>IIBBBBB', size, size, 8, 6, 0, 0, 0))
+          png += chunk(b'IDAT', zlib.compress(raw, 9))
+          png += chunk(b'IEND', b'')
+
+          # ICO containing the PNG image.
+          ico = struct.pack('<HHH', 0, 1, 1)
+          ico += struct.pack('<BBBBHHII', size, size, 0, 0, 1, 32, len(png), 22)
+          ico += png
+          (out / 'icon.ico').write_bytes(ico)
+          print(f'Created {out / "icon.ico"} ({len(ico)} bytes)')
+          PY
+
       - name: Build Windows installer
         run: tauri build
 
