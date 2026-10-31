@@ -29,6 +29,7 @@
     "active": true,
     "targets": ["nsis", "msi"],
     "category": "Business",
-    "shortDescription": "Desktop material, customer, stock and invoice management"
+    "shortDescription": "Desktop material, customer, stock and invoice management",
+    "icon": ["icons/icon.ico"]
   }
 }
