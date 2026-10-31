@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "in.cysecguardians.materialmanagementsystem",
   "build": {
-    "beforeDevCommand": "npm --prefix app run dev",
+    "beforeDevCommand": "npm --prefix ../app run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm --prefix app run build",
+    "beforeBuildCommand": "npm --prefix ../app run build",
     "frontendDist": "../app/dist"
   },
   "app": {
