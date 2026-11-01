@@ -9,12 +9,33 @@ The customer creates and owns the Supabase account and project. The vendor confi
 1. Customer creates a Supabase account.
 2. Customer creates a new project in the appropriate region.
 3. Enable and configure the required authentication method(s).
-4. Obtain the project URL and publishable key (or legacy anon key).
-5. Apply the repository SQL migrations in the documented order using the Supabase SQL Editor.
-6. Configure Auth URL settings only if required by the selected login flow.
+4. Configure the Windows authentication deep-link settings described below.
+5. Obtain the project URL and publishable key (or legacy anon key).
+6. Apply the repository SQL migrations in the documented order using the Supabase SQL Editor.
 7. Create the first administrator using the secure bootstrap process below.
 8. Configure the desktop application on each office PC with the same project URL and publishable key.
-9. Test sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, access controls, audit logging, and login-session reporting.
+9. Test email confirmation, sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, access controls, audit logging, and login-session reporting.
+
+## Windows authentication deep link
+
+The desktop application uses the custom URI scheme:
+
+```text
+materialmanagement://auth/callback
+```
+
+This is required because the Windows desktop application is not served from `http://localhost:3000`. Tauri registers the custom scheme with Windows, and the desktop application consumes the Supabase session returned in the URL fragment after email confirmation.
+
+In the customer's Supabase dashboard, open **Authentication → URL Configuration** and set:
+
+- **Site URL:** `materialmanagement://auth/callback`
+- **Redirect URLs:** add the exact value `materialmanagement://auth/callback`
+
+Keep the redirect URL exact for production. Supabase uses the Site URL when no explicit redirect is supplied, and custom deep-link URIs are supported for authentication flows. citeturn322078search8turn322078search0
+
+Do not use `http://localhost:3000` as the production Site URL for the desktop application. That value is a common default for web development and causes the confirmation link to open a browser page that is not running in the installed desktop application. citeturn322078search2
+
+The desktop build uses Tauri's deep-link and single-instance plugins so Windows can open/focus the existing application and deliver the callback URL to it. Tauri documents the desktop configuration under `plugins.deep-link.desktop.schemes`, and Windows deep links are delivered through the application process. citeturn246805search4turn357267search0
 
 ## Application configuration
 
