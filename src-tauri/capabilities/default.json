@@ -3,5 +3,9 @@
   "identifier": "default",
   "description": "Default desktop application capability",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:event:default",
+    "deep-link:default"
+  ]
 }
