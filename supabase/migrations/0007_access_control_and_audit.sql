@@ -1,6 +1,6 @@
 -- Material Management System
 -- Admin access control, team management and audit helpers.
--- Apply manually in each customer's Supabase SQL Editor after 0006.
+-- Safe to apply more than once in a customer database.
 
 begin;
 
@@ -175,17 +175,20 @@ grant execute on function public.set_member_active(uuid,uuid,boolean) to authent
 -- Keep direct inserts admin-only; existing transactional security-definer functions
 -- can continue to write audit rows because they run with their owner's privileges.
 drop policy if exists audit_log_member_insert on public.audit_log;
+drop policy if exists audit_log_admin_insert on public.audit_log;
 create policy audit_log_admin_insert on public.audit_log
 for insert to authenticated
 with check (public.is_org_admin(organization_id));
 
 drop policy if exists audit_log_member_update on public.audit_log;
+drop policy if exists audit_log_no_update on public.audit_log;
 create policy audit_log_no_update on public.audit_log
 for update to authenticated
 using (false)
 with check (false);
 
 drop policy if exists audit_log_member_delete on public.audit_log;
+drop policy if exists audit_log_no_delete on public.audit_log;
 create policy audit_log_no_delete on public.audit_log
 for delete to authenticated
 using (false);
