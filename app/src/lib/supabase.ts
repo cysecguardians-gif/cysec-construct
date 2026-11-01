@@ -6,6 +6,7 @@ import { closeTrackedLoginSession } from './sessionTracking';
 let client: SupabaseClient | null = null;
 let activeConfig: SupabaseConfig | null = null;
 let deepLinkStarted = false;
+const processingAuthDeepLinks = new Set<string>();
 const AUTH_DEEP_LINK_PREFIX = 'materialmanagement://auth/callback';
 const LAST_AUTH_DEEP_LINK_KEY = 'mms.lastAuthDeepLink';
 
@@ -15,10 +16,9 @@ function isAuthDeepLink(value: string): boolean {
 
 async function processAuthDeepLink(url: string, supabase: SupabaseClient): Promise<void> {
   if (!isAuthDeepLink(url)) return;
-
-  // Tauri can expose the same startup URL again when the webview is reloaded.
-  // Ignore the exact callback once it has already been consumed successfully.
   if (sessionStorage.getItem(LAST_AUTH_DEEP_LINK_KEY) === url) return;
+  if (processingAuthDeepLinks.has(url)) return;
+  processingAuthDeepLinks.add(url);
 
   try {
     const parsed = new URL(url);
@@ -53,6 +53,8 @@ async function processAuthDeepLink(url: string, supabase: SupabaseClient): Promi
     window.location.reload();
   } catch (error) {
     console.error('Could not complete Supabase authentication callback:', error);
+  } finally {
+    processingAuthDeepLinks.delete(url);
   }
 }
 
@@ -104,4 +106,5 @@ export function resetSupabaseClient(): void {
   client = null;
   activeConfig = null;
   deepLinkStarted = false;
+  processingAuthDeepLinks.clear();
 }
