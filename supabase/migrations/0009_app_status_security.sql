@@ -36,6 +36,7 @@ begin
 end;
 $$;
 
+revoke execute on function public.get_app_status() from public;
 grant execute on function public.get_app_status() to authenticated;
 
 commit;
