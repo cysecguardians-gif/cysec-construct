@@ -31,11 +31,11 @@ In the customer's Supabase dashboard, open **Authentication → URL Configuratio
 - **Site URL:** `materialmanagement://auth/callback`
 - **Redirect URLs:** add the exact value `materialmanagement://auth/callback`
 
-Keep the redirect URL exact for production. Supabase uses the Site URL when no explicit redirect is supplied, and custom deep-link URIs are supported for authentication flows. citeturn322078search8turn322078search0
+Keep the redirect URL exact for production. Supabase uses the Site URL when no explicit redirect is supplied, and custom deep-link URIs are supported for authentication flows.
 
-Do not use `http://localhost:3000` as the production Site URL for the desktop application. That value is a common default for web development and causes the confirmation link to open a browser page that is not running in the installed desktop application. citeturn322078search2
+Do not use `http://localhost:3000` as the production Site URL for the desktop application. That value is a common default for web development and causes the confirmation link to open a browser page that is not running in the installed desktop application.
 
-The desktop build uses Tauri's deep-link and single-instance plugins so Windows can open/focus the existing application and deliver the callback URL to it. Tauri documents the desktop configuration under `plugins.deep-link.desktop.schemes`, and Windows deep links are delivered through the application process. citeturn246805search4turn357267search0
+The desktop build uses Tauri's deep-link and single-instance plugins so Windows can open/focus the existing application and deliver the callback URL to it. Tauri documents the desktop configuration under `plugins.deep-link.desktop.schemes`, and Windows deep links are delivered through the application process.
 
 ## Application configuration
 
