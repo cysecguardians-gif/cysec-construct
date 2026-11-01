@@ -16,6 +16,7 @@ const migrationFiles = [
   '0006_material_stock_threshold.sql',
   '0007_access_control_and_audit.sql',
   '0008_login_session_tracking.sql',
+  '0009_app_status_security.sql',
 ];
 
 const sections = [];
