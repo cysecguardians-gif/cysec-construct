@@ -1,3 +1,7 @@
+-- Material Management System
+-- Login/session tracking.
+-- Safe to apply more than once in a customer database.
+
 begin;
 
 -- ============================================================
@@ -119,5 +123,15 @@ create index if not exists idx_login_sessions_org_active
 
 create index if not exists idx_login_sessions_user_date
   on public.login_sessions(user_id, login_at desc);
+
+-- Mark the complete schema as version 8. This is what the desktop application verifies.
+create table if not exists public.app_schema_version (
+  version integer primary key,
+  applied_at timestamptz not null default now()
+);
+
+insert into public.app_schema_version(version)
+values (8)
+on conflict (version) do nothing;
 
 commit;
