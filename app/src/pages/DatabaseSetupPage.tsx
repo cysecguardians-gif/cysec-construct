@@ -51,13 +51,12 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
   useEffect(() => {
     void verify();
-    // This page is intentionally verified once on entry; the user can manually verify after running SQL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div className="auth-page">
-      <div className="auth-card setup-wide">
+      <div className="auth-card" style={{ width: 'min(700px, 100%)' }}>
         <div className="brand auth-brand">
           <span className="brand-mark">M</span>
           <div><strong>Material Management</strong><small>Business Edition</small></div>
@@ -72,32 +71,31 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
           </p>
         </div>
 
-        <div className="setup-card">
-          <h3>Run the SQL migrations in Supabase</h3>
-          <p>
-            Open the Supabase SQL Editor and run these files in order. The SQL is already stored in this product's
-            GitHub repository under <strong>supabase/migrations/</strong>.
-          </p>
-          <ol className="migration-list">
-            {migrations.map((migration) => <li key={migration}><code>{migration}</code></li>)}
-          </ol>
-          <div className="setup-actions">
+        <div className="stack" style={{ gap: 12 }}>
+          <div className="setup-card" style={{ display: 'block', marginBottom: 0 }}>
+            <h3>Run the SQL migrations in Supabase</h3>
+            <p>
+              Open the Supabase SQL Editor and run these files in order. The SQL is already stored in this product's
+              GitHub repository under <strong>supabase/migrations/</strong>.
+            </p>
+            <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
+              {migrations.map((migration) => <li key={migration}><code>{migration}</code></li>)}
+            </ol>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <a
-              className="secondary button-link"
               href="https://github.com/cysecguardians-gif/material-management-system/blob/main/docs/SUPABASE_SETUP.md"
               target="_blank"
               rel="noreferrer"
-            >
-              Open setup guide
-            </a>
+              style={{ display: 'inline-block', border: '1px solid #d6dce5', borderRadius: 9, padding: '10px 14px', color: '#344054', textDecoration: 'none', fontSize: 12 }}
+            >Open setup guide</a>
             <a
-              className="secondary button-link"
               href="https://supabase.com/dashboard"
               target="_blank"
               rel="noreferrer"
-            >
-              Open Supabase
-            </a>
+              style={{ display: 'inline-block', border: '1px solid #d6dce5', borderRadius: 9, padding: '10px 14px', color: '#344054', textDecoration: 'none', fontSize: 12 }}
+            >Open Supabase</a>
           </div>
         </div>
 
