@@ -11,10 +11,28 @@ The customer creates and owns the Supabase account and project. The vendor confi
 3. Enable and configure the required authentication method(s).
 4. Configure the Windows authentication deep-link settings described below.
 5. Obtain the project URL and publishable key (or legacy anon key).
-6. Apply the repository SQL migrations in the documented order using the Supabase SQL Editor.
-7. Create the first administrator using the secure bootstrap process below.
+6. Install the database schema using the **Database Setup** screen in the Windows application. The complete customer setup SQL is bundled into the installer; customers do not need access to the vendor's private GitHub repository.
+7. Create the first administrator through the desktop application's secure bootstrap process.
 8. Configure the desktop application on each office PC with the same project URL and publishable key.
 9. Test email confirmation, sign-in, organization isolation, stock/invoice workflows, GST/discount calculations, payments, access controls, audit logging, and login-session reporting.
+
+## Customer database installation
+
+The product source keeps the database migrations privately in `supabase/migrations/` for version control. Customers are **not** expected to access that repository.
+
+During the application build, the eight version-controlled migrations are combined into one production database setup SQL file and bundled into the Windows desktop application. The Database Setup screen lets the customer copy that complete SQL script to the clipboard.
+
+The customer then:
+
+1. Clicks **Copy database setup SQL** in the desktop application.
+2. Opens the Supabase SQL Editor for their own project.
+3. Pastes the copied SQL.
+4. Clicks **Run** in Supabase.
+5. Returns to the desktop application and clicks **Verify database setup**.
+
+The desktop application never needs a Supabase service-role key or database password to perform this setup. The application only uses the customer's publishable/anon key for normal authenticated access.
+
+The **Verify database setup** action only checks the installed schema. It does not execute arbitrary DDL and does not require elevated database credentials.
 
 ## Windows authentication deep link
 
@@ -35,7 +53,7 @@ Keep the redirect URL exact for production. Supabase uses the Site URL when no e
 
 Do not use `http://localhost:3000` as the production Site URL for the desktop application. That value is a common default for web development and causes the confirmation link to open a browser page that is not running in the installed desktop application.
 
-The desktop build uses Tauri's deep-link and single-instance plugins so Windows can open/focus the existing application and deliver the callback URL to it. Tauri documents the desktop configuration under `plugins.deep-link.desktop.schemes`, and Windows deep links are delivered through the application process.
+The desktop build uses Tauri's deep-link and single-instance plugins so Windows can open/focus the existing application and deliver the callback URL to it.
 
 ## Application configuration
 
@@ -46,7 +64,7 @@ Never request or store the customer's Supabase account password, database passwo
 
 ## SQL migration policy
 
-Migrations are committed to `supabase/migrations/` and have stable sequence numbers. Apply each migration once, in ascending order. Record the applied migration/version for each customer environment. Review the target project before applying a migration, and take a suitable backup before production schema changes.
+Migrations are committed privately to `supabase/migrations/` and have stable sequence numbers. They are the internal source of truth for the product database schema. The customer-facing installer receives a generated, consolidated copy of these migrations during the application build.
 
 The migrations currently are:
 
@@ -132,7 +150,7 @@ A successful network request alone does not prove the schema is correctly instal
 
 ## Migration order
 
-For a new customer database, run:
+Internally, the product schema is maintained in this order:
 
 ```text
 0001_initial_schema.sql
@@ -145,6 +163,8 @@ For a new customer database, run:
 0008_login_session_tracking.sql
 ```
 
-Do not edit an already-applied migration for a customer. Create a new numbered migration for later schema changes.
+Customers do not need to access these individual files. The Windows application bundles the consolidated setup script generated from them.
 
-The first release uses manual migration application. Do not add an in-app button that executes arbitrary DDL with a service-role key.
+Do not edit an already-applied migration for a customer. Create a new numbered migration for later schema changes and ensure the build-time customer setup generator includes it.
+
+The product never puts a service-role key or database password into the desktop installer.
