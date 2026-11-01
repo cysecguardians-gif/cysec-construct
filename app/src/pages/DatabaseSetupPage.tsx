@@ -8,6 +8,14 @@ type Props = {
   onReady: () => void;
 };
 
+type AppStatusResponse = {
+  ok?: boolean;
+  authenticated?: boolean;
+  schema_version?: number | null;
+  currency_code?: string;
+  locale?: string;
+};
+
 export default function DatabaseSetupPage({ supabase, error: initialError, onReady }: Props) {
   const [error, setError] = useState(initialError ?? '');
   const [busy, setBusy] = useState(false);
@@ -21,25 +29,38 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
     const { data, error: rpcError } = await supabase.rpc('get_app_status');
     if (rpcError) {
-      setMessage('Database schema has not been installed yet.');
+      console.error('Database verification RPC failed:', {
+        code: rpcError.code,
+        message: rpcError.message,
+        details: rpcError.details,
+        hint: rpcError.hint,
+      });
+      setMessage('Database verification RPC failed.');
       if (rpcError.code === 'PGRST202' || rpcError.code === 'PGRST205') {
         setError('Install the database setup SQL below in this Supabase project, then click Verify database setup.');
       } else {
-        setError(`Database verification failed: ${rpcError.message}`);
+        setError(`Database verification failed: ${rpcError.message}${rpcError.code ? ` (code ${rpcError.code})` : ''}`);
       }
       setBusy(false);
       return;
     }
 
-    const version = Number((data as { schema_version?: number } | null)?.schema_version ?? 0);
+    console.info('Database verification RPC response:', data);
+
+    const appStatus = data as AppStatusResponse | null;
+    const version = Number(appStatus?.schema_version ?? 0);
+    const responseSummary = appStatus
+      ? `RPC succeeded • authenticated=${String(appStatus.authenticated ?? 'unknown')} • schema_version=${String(appStatus.schema_version ?? 'null')}`
+      : 'RPC succeeded, but returned no status object.';
+
     if (version < 8) {
-      setMessage(`Database schema version ${version || 'not detected'} is incomplete.`);
-      setError('The database setup is incomplete. Run the complete setup SQL from this screen, then verify again.');
+      setMessage(`${responseSummary}.`);
+      setError('The database schema exists but the app did not receive schema version 8 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
       setBusy(false);
       return;
     }
 
-    setMessage(`Database schema v${version} is ready.`);
+    setMessage(`${responseSummary}. Database schema v${version} is ready.`);
     setBusy(false);
     onReady();
   }
