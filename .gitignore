@@ -8,6 +8,9 @@ build/
 target/
 src-tauri/target/
 
+# Generated application assets
+app/src/generated/
+
 # Environment and secrets
 .env
 .env.*
