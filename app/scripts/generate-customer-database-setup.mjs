@@ -18,6 +18,7 @@ const migrationFiles = [
   '0008_login_session_tracking.sql',
   '0009_app_status_security.sql',
   '0010_staff_membership_management.sql',
+  '0011_first_admin_lock_and_imports.sql',
 ];
 
 const sections = [];
