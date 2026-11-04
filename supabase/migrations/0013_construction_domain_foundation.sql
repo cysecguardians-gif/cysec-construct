@@ -6,6 +6,11 @@
 
 begin;
 
+-- Existing materials are keyed by UUID; add the composite uniqueness required
+-- for tenant-consistent foreign keys in the construction tables.
+create unique index if not exists uq_materials_organization_id_id
+  on public.materials(organization_id, id);
+
 -- ============================================================
 -- 1. Client companies, awarded contracts and projects
 -- ============================================================
