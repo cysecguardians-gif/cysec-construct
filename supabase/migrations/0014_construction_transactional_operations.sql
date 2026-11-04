@@ -448,7 +448,7 @@ grant execute on function public.create_project(uuid,uuid,text,text,text,text,te
 revoke all on function public.create_vendor(uuid,text,text,text,text,text,text,text,text,text,text,text) from public, anon;
 grant execute on function public.create_vendor(uuid,text,text,text,text,text,text,text,text,text,text,text) to authenticated;
 revoke all on function public.create_contractor(uuid,text,text,text,text,text,text,text,text,text,text,text,text,text) from public, anon;
-grant execute on function public.create_contractor(uuid,text,text,text,text,text,text,text,text,text,text,text,text,text,text) to authenticated;
+grant execute on function public.create_contractor(uuid,text,text,text,text,text,text,text,text,text,text,text,text,text) to authenticated;
 revoke all on function public.create_contractor_work_order(uuid,uuid,uuid,text,text,bigint,numeric,date,boolean,date,date,text,text,text) from public, anon;
 grant execute on function public.create_contractor_work_order(uuid,uuid,uuid,text,text,bigint,numeric,date,boolean,date,date,text,text,text) to authenticated;
 revoke all on function public.record_material_purchase(uuid,uuid,jsonb,date,text,text,bigint,text) from public, anon;
