@@ -11,6 +11,7 @@ export default function ContractorClosurePage({supabase,organizationId,onBack}:P
  const [orders,setOrders]=useState<WorkOrder[]>([]),[contractors,setContractors]=useState<Contractor[]>([]),[lines,setLines]=useState<Line[]>([]),[settlements,setSettlements]=useState<Settlement[]>([]);
  const [selected,setSelected]=useState(''),[usage,setUsage]=useState<Record<string,string>>({}),[settlementNo,setSettlementNo]=useState(''),[otherDeductions,setOtherDeductions]=useState('0'),[adjustments,setAdjustments]=useState('0'),[payment,setPayment]=useState(''),[paymentMethod,setPaymentMethod]=useState('bank_transfer');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const [completionDate,setCompletionDate]=useState(new Date().toISOString().slice(0,10)),[settlementDate,setSettlementDate]=useState(new Date().toISOString().slice(0,10)),[paymentDate,setPaymentDate]=useState(new Date().toISOString().slice(0,10));
  async function load(){const [w,c,l,s]=await Promise.all([
   supabase.from('contractor_work_orders').select('id,po_number,contractor_id,contract_id,agreed_work_amount_paise,status').eq('organization_id',organizationId).order('created_at',{ascending:false}),
   supabase.from('contractors').select('id,name').eq('organization_id',organizationId),
@@ -19,7 +20,7 @@ export default function ContractorClosurePage({supabase,organizationId,onBack}:P
  ]);const e=w.error||c.error||l.error||s.error;if(e){setError(e.message);return}setOrders(w.data??[]);setContractors(c.data??[]);setLines(l.data??[]);setSettlements(s.data??[]);if(!selected&&w.data?.[0])setSelected(w.data[0].id);}
  useEffect(()=>{void load()},[organizationId]);
  const current=orders.find(x=>x.id===selected),currentLines=useMemo(()=>lines.filter(x=>x.work_order_id===selected),[lines,selected]),currentSettlement=settlements.find(x=>x.work_order_id===selected);
- async function action(fn:()=>Promise<{error:any}>,ok:string){setBusy(true);setError('');setNotice('');const r=await fn();if(r.error)setError(r.error.message);else{setNotice(ok);await load()}setBusy(false)}
+ async function action(fn:()=>PromiseLike<{error:any}>,ok:string){setBusy(true);setError('');setNotice('');const r=await fn();if(r.error)setError(r.error.message);else{setNotice(ok);await load()}setBusy(false)}
  async function complete(){if(!selected)return;await action(()=>supabase.rpc('complete_contractor_work_order',{p_organization_id:organizationId,p_work_order_id:selected,p_actual_completion_date:completionDate}),'Work order marked completed.')}
  async function reconcile(line:Line){const qty=usage[line.issue_item_id]??String(line.quantity_used);await action(()=>supabase.rpc('reconcile_contractor_material_usage',{p_organization_id:organizationId,p_work_order_id:selected,p_issue_item_id:line.issue_item_id,p_quantity_used:Number(qty),p_notes:null}),'Material usage reconciled.')}
  async function prepare(){if(!selected)return;await action(()=>supabase.rpc('prepare_contractor_settlement',{p_organization_id:organizationId,p_work_order_id:selected,p_settlement_number:settlementNo,p_settlement_date:settlementDate,p_other_deductions_paise:paise(otherDeductions),p_adjustments_paise:paise(adjustments),p_notes:null}),'Settlement prepared.');setSettlementNo('')}
