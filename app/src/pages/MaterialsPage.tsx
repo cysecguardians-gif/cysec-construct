@@ -25,7 +25,7 @@ type Movement = { id: string; movement_type: string; quantity: number; notes: st
 type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
 
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-const movementLabels: Record<string, string> = { opening: 'Opening', purchase: 'Purchase', sale: 'Sale', adjustment_in: 'Adjustment in', adjustment_out: 'Adjustment out', return_in: 'Return in', return_out: 'Return out' };
+const movementLabels: Record<string, string> = { opening: 'Opening', purchase: 'Purchase', sale: 'Sale / contractor issue', adjustment_in: 'Adjustment in', adjustment_out: 'Adjustment out', return_in: 'Return in', return_out: 'Return out' };
 const incoming = new Set(['opening', 'purchase', 'adjustment_in', 'return_in']);
 
 export default function MaterialsPage({ supabase, organizationId, onBack }: Props) {
