@@ -195,6 +195,8 @@ select
   coalesce(r.received_paise, 0)::bigint as received_paise,
   greatest(coalesce(b.billed_paise, 0) - coalesce(a.allocated_paise, 0), 0)::bigint as pending_against_bills_paise,
   coalesce(d.deductions_paise, 0)::bigint as deductions_paise,
+  coalesce(d.non_retention_deductions_paise, 0)::bigint as non_retention_deductions_paise,
+  greatest(coalesce(b.billed_paise, 0) - coalesce(a.allocated_paise, 0) - coalesce(d.non_retention_deductions_paise, 0), 0)::bigint as pending_after_deductions_paise,
   coalesce(d.retention_paise, 0)::bigint as retention_paise,
   greatest(c.revised_value_paise - coalesce(b.billed_paise, 0), 0)::bigint as not_yet_billed_paise
 from public.contracts c
@@ -216,6 +218,7 @@ left join (
 left join (
   select organization_id, contract_id,
     sum(amount_paise) deductions_paise,
+    sum(amount_paise) filter (where category not in ('retention','security_deposit') and recoverable=false) non_retention_deductions_paise,
     sum(amount_paise) filter (where category in ('retention','security_deposit')) retention_paise
   from public.client_deductions group by organization_id, contract_id
 ) d on d.organization_id=c.organization_id and d.contract_id=c.id;
