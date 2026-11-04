@@ -12,6 +12,8 @@ const paise=(v:string)=>Math.round((Number(v)||0)*100);
 export default function ConstructionContractsPage({supabase,organizationId,onBack}:Props){
  const [clients,setClients]=useState<ClientCompany[]>([]),[contracts,setContracts]=useState<Contract[]>([]),[finance,setFinance]=useState<Finance[]>([]),[projects,setProjects]=useState<Project[]>([]);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState('');
+ const [contractDate,setContractDate]=useState(new Date().toISOString().slice(0,10)),[contractStart,setContractStart]=useState(''),[contractDue,setContractDue]=useState('');
+ const [billDate,setBillDate]=useState(new Date().toISOString().slice(0,10)),[receiptDate,setReceiptDate]=useState(new Date().toISOString().slice(0,10)),[deductDate,setDeductDate]=useState(new Date().toISOString().slice(0,10));
  const [clientName,setClientName]=useState(''),[contractClient,setContractClient]=useState(''),[contractNo,setContractNo]=useState(''),[title,setTitle]=useState(''),[value,setValue]=useState(''),[projectName,setProjectName]=useState(''),[projectContract,setProjectContract]=useState('');
  const [billContract,setBillContract]=useState(''),[billNo,setBillNo]=useState(''),[billAmount,setBillAmount]=useState('');
  const [receiptContract,setReceiptContract]=useState(''),[receiptAmount,setReceiptAmount]=useState(''),[receiptRef,setReceiptRef]=useState('');
@@ -25,7 +27,7 @@ export default function ConstructionContractsPage({supabase,organizationId,onBac
  ]);const err=c.error||k.error||p.error||f.error;if(err){setError(err.message);return}setClients(c.data??[]);setContracts(k.data??[]);setProjects(p.data??[]);setFinance(f.data??[]);if(!contractClient&&c.data?.[0])setContractClient(c.data[0].id);if(!selected&&k.data?.[0])setSelected(k.data[0].id);if(!projectContract&&k.data?.[0])setProjectContract(k.data[0].id);}
  useEffect(()=>{void load()},[organizationId]);
  const current=useMemo(()=>finance.find(x=>x.contract_id===selected),[finance,selected]);
- async function run(fn:()=>Promise<{error:any}> ,success:string){setBusy(true);setError('');setNotice('');const r=await fn();if(r.error)setError(r.error.message);else{setNotice(success);await load()}setBusy(false)}
+ async function run(fn:()=>PromiseLike<{error:any}> ,success:string){setBusy(true);setError('');setNotice('');const r=await fn();if(r.error)setError(r.error.message);else{setNotice(success);await load()}setBusy(false)}
  async function addClient(e:React.FormEvent){e.preventDefault();await run(()=>supabase.from('client_companies').insert({organization_id:organizationId,name:clientName.trim()}), 'Client company added.');setClientName('')}
  async function addContract(e:React.FormEvent){e.preventDefault();await run(()=>supabase.from('contracts').insert({organization_id:organizationId,client_company_id:contractClient,contract_number:contractNo.trim(),title:title.trim(),original_value_paise:paise(value),revised_value_paise:paise(value),contract_date:contractDate,start_date:contractStart||null,expected_completion_date:contractDue||null}), 'Contract created.');setContractNo('');setTitle('');setValue('')}
  async function addProject(e:React.FormEvent){e.preventDefault();await run(()=>supabase.from('projects').insert({organization_id:organizationId,contract_id:projectContract,name:projectName.trim()}),'Project added.');setProjectName('')}
