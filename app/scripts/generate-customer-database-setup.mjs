@@ -81,7 +81,7 @@ const settlementUpgradeSql = [
   '',
   '-- End of contractor settlement upgrade',
   '',
-].join('\\n\\n');
+].join('\n\n');
 
 await fs.writeFile(settlementUpgradeOutputFile, `${JSON.stringify(settlementUpgradeSql, null, 2)}\n`, 'utf8');
 console.log(`Generated customer database setup SQL: ${outputFile}`);
