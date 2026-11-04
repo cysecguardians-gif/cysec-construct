@@ -4,7 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 type Movement = { id: string; material_id: string; movement_type: string; quantity: number; notes: string | null; created_at: string; reference_type: string | null; reference_id: string | null; materials?: { name: string; selling_price_paise: number; units?: { short_code: string } | null } | null };
 type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-const labels: Record<string, string> = { opening: 'Opening', purchase: 'Purchase', sale: 'Sale', adjustment_in: 'Adjustment in', adjustment_out: 'Adjustment out', return_in: 'Return in', return_out: 'Return out' };
+const labels: Record<string, string> = { opening: 'Opening', purchase: 'Vendor purchase', sale: 'Sale / contractor issue', adjustment_in: 'Adjustment in', adjustment_out: 'Adjustment out', return_in: 'Return / contractor return', return_out: 'Return out' };
 const incoming = new Set(['opening', 'purchase', 'adjustment_in', 'return_in']);
 const outgoing = new Set(['sale', 'adjustment_out', 'return_out']);
 const today = () => new Date().toISOString().slice(0, 10);
