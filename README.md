@@ -15,7 +15,16 @@ A reusable Windows desktop application for construction contract finance, vendor
 - Employee accounts, role-based access, login/session history, and audit trails.
 - Reusable multi-organization data model suitable for future deployments.
 
-## Primary application sections\n\n1. Tender / Contract Management\n2. Material Management\n3. Contractor Management\n4. Contractor Closure & Settlement\n\nSee [construction workflow design](docs/construction-workflows.md) for the business rules and data model.\n\n## Architecture
+## Primary application sections
+
+1. Tender / Contract Management
+2. Material Management
+3. Contractor Management
+4. Contractor Closure & Settlement
+
+See [construction workflow design](docs/construction-workflows.md) for the business rules and data model.
+
+## Architecture
 
 ```text
 GitHub repository (product source + SQL migrations + documentation)
