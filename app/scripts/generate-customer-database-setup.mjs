@@ -7,6 +7,7 @@ const migrationDir = path.resolve(appDir, '..', 'supabase', 'migrations');
 const outputDir = path.join(appDir, 'src', 'generated');
 const outputFile = path.join(outputDir, 'customerDatabaseSetup.json');
 const upgradeOutputFile = path.join(outputDir, 'constructionWorkflowUpgrade.json');
+const settlementUpgradeOutputFile = path.join(outputDir, 'contractorSettlementUpgrade.json');
 
 const migrationFiles = [
   '0001_initial_schema.sql',
@@ -24,6 +25,7 @@ const migrationFiles = [
   '0013_construction_workflow_foundation.sql',
   '0014_construction_transactional_operations.sql',
   '0015_client_contract_finance.sql',
+  '0016_allow_replacement_cancelled_settlements.sql',
 ];
 
 const upgradeMigrationFiles = migrationFiles.filter(file => /^001[3-5]_/.test(file));
@@ -66,5 +68,22 @@ const upgradeSql = [
 ].join('\n\n');
 
 await fs.writeFile(upgradeOutputFile, `${JSON.stringify(upgradeSql, null, 2)}\n`, 'utf8');
+
+const settlementMigration = '0016_allow_replacement_cancelled_settlements.sql';
+const settlementSource = await fs.readFile(path.join(migrationDir, settlementMigration), 'utf8');
+const settlementUpgradeSql = [
+  '-- Material Management System — Contractor Settlement Upgrade',
+  '-- For existing databases at schema version 15. Run migration 0016 only.',
+  '-- Do not rerun migrations 0013, 0014 or 0015, and do not rerun the original database setup SQL.',
+  '',
+  `-- Internal migration: ${settlementMigration}`,
+  settlementSource.trim(),
+  '',
+  '-- End of contractor settlement upgrade',
+  '',
+].join('\\n\\n');
+
+await fs.writeFile(settlementUpgradeOutputFile, `${JSON.stringify(settlementUpgradeSql, null, 2)}\n`, 'utf8');
 console.log(`Generated customer database setup SQL: ${outputFile}`);
 console.log(`Generated construction workflow upgrade SQL: ${upgradeOutputFile}`);
+console.log(`Generated contractor settlement upgrade SQL: ${settlementUpgradeOutputFile}`);
