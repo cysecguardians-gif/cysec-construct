@@ -140,9 +140,16 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="secondary" type="button" onClick={() => void (schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? copyUpgradeSql() : copySetupSql())}>
-              {copied ? 'SQL copied' : schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? 'Copy construction workflow upgrade SQL' : 'Copy database setup SQL'}
-            </button>
+            {(schemaVersion === null || schemaVersion < 8) && (
+              <button className="secondary" type="button" onClick={() => void copySetupSql()}>
+                {copied ? 'SQL copied' : 'Copy database setup SQL'}
+              </button>
+            )}
+            {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 && (
+              <button className="secondary" type="button" onClick={() => void copyUpgradeSql()}>
+                {copied ? 'SQL copied' : 'Copy construction workflow upgrade SQL'}
+              </button>
+            )}
             <a
               href="https://supabase.com/dashboard"
               target="_blank"
@@ -152,6 +159,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
           </div>
         </div>
 
+        {schemaVersion !== null && schemaVersion >= 8 && schemaVersion < 12 && <div className="alert info">This database is on an older intermediate schema. Apply its missing numbered migrations in sequence before the construction workflow upgrade. The full setup script is intentionally not offered here to protect existing business data.</div>}
         {message && <div className="alert info">{message}</div>}
         {error && <div className="alert error">{error}</div>}
 
