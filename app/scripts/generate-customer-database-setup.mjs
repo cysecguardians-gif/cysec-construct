@@ -63,8 +63,8 @@ const upgradeSql = [
   '',
   '-- End of construction workflow upgrade',
   '',
-].join('\\n\\n');
+].join('\n\n');
 
-await fs.writeFile(upgradeOutputFile, `${JSON.stringify(upgradeSql, null, 2)}\\n`, 'utf8');
+await fs.writeFile(upgradeOutputFile, `${JSON.stringify(upgradeSql, null, 2)}\n`, 'utf8');
 console.log(`Generated customer database setup SQL: ${outputFile}`);
 console.log(`Generated construction workflow upgrade SQL: ${upgradeOutputFile}`);
