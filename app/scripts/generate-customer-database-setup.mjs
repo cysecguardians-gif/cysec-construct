@@ -20,6 +20,7 @@ const migrationFiles = [
   '0010_staff_membership_management.sql',
   '0011_first_admin_lock_and_imports.sql',
   '0012_import_integrity.sql',
+  '0013_construction_domain_foundation.sql',
 ];
 
 const sections = [];
