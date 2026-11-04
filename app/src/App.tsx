@@ -56,7 +56,7 @@ export default function App(){
  if(screen==='contractor-management'&&organizationId)return shell(<ContractorManagementPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'contractor-management');
  if(screen==='contractor-closure'&&organizationId)return shell(<ContractorClosurePage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'contractor-closure');
  if(screen==='materials'&&organizationId)return shell(<MaterialsPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'materials');
- if(screen==='stock-ledger'&&organizationId)return shell(<StockLedgerPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('materials')}/>,'stock-ledger');
+ if(screen==='stock-ledger'&&organizationId)return shell(<StockLedgerPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('construction-materials')}/>,'stock-ledger');
  if(screen==='customers'&&organizationId)return shell(<CustomersPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'customers');
  if(screen==='invoices'&&organizationId)return shell(<InvoicesPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')} onOpenInvoice={id=>{setInvoiceId(id);setScreen('invoice-detail')}}/>,'invoices');
  if(screen==='invoice-detail'&&organizationId&&invoiceId)return shell(<InvoiceDetailPage supabase={supabase} organizationId={organizationId} invoiceId={invoiceId} onBack={()=>setScreen('invoices')}/>,'invoices');
