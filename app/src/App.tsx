@@ -9,12 +9,16 @@ import PaymentsPage from './pages/PaymentsPage';
 import ReportsPage from './pages/ReportsPage';
 import AccessAuditPage from './pages/AccessAuditPage';
 import DataImportPage from './pages/DataImportPage';
+import TenderManagementPage from './pages/TenderManagementPage';
+import MaterialManagementPage from './pages/MaterialManagementPage';
+import ContractorManagementPage from './pages/ContractorManagementPage';
+import ContractorClosurePage from './pages/ContractorClosurePage';
 import DatabaseSetupPage from './pages/DatabaseSetupPage';
 import { clearSupabaseConfig, loadSupabaseConfig, normalizeSupabaseUrl, saveSupabaseConfig, type SupabaseConfig } from './lib/config';
 import { getSupabaseClient, resetSupabaseClient } from './lib/supabase';
 import { endLoginSession, startLoginSession, touchLoginSession } from './lib/sessionTracking';
 
-type Screen='config'|'admin-setup'|'login'|'database-setup'|'organization'|'dashboard'|'materials'|'stock-ledger'|'customers'|'invoices'|'invoice-detail'|'payments'|'reports'|'access-audit'|'data-import';
+type Screen='config'|'admin-setup'|'login'|'database-setup'|'organization'|'dashboard'|'materials'|'stock-ledger'|'customers'|'invoices'|'invoice-detail'|'payments'|'reports'|'access-audit'|'data-import'|'tenders'|'material-management'|'contractor-management'|'contractor-closure';
 type SetupStatus={initialized:boolean;admin_exists:boolean;schema_version:number};
 type AppStatus={ok:boolean;authenticated:boolean;schema_version?:number;currency_code?:string;locale?:string};
 type DashboardInvoice={invoice_id:string;customer_id:string;invoice_number:string;invoice_date:string;grand_total_paise:number;pending_amount_paise:number;payment_status:string};
@@ -47,6 +51,10 @@ export default function App(){
  if(!session||screen==='login')return <LoginPage supabase={supabase} error={error} setError={setError} onSignedIn={()=>setScreen('dashboard')}/>;
  if(screen==='organization')return <OrganizationSetupPage supabase={supabase} error={error} setError={setError} onComplete={id=>{setOrganizationId(id);setScreen('dashboard')}}/>;
  const shell=(children:React.ReactNode,active:string)=><AppShell active={active} onNavigate={setScreen} onSignOut={signOut} onChangeConnection={changeConnection}>{children}</AppShell>;
+ if(screen==='tenders'&&organizationId)return shell(<TenderManagementPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'tenders');
+ if(screen==='material-management'&&organizationId)return shell(<MaterialManagementPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'material-management');
+ if(screen==='contractor-management'&&organizationId)return shell(<ContractorManagementPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'contractor-management');
+ if(screen==='contractor-closure'&&organizationId)return shell(<ContractorClosurePage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'contractor-closure');
  if(screen==='materials'&&organizationId)return shell(<MaterialsPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'materials');
  if(screen==='stock-ledger'&&organizationId)return shell(<StockLedgerPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('materials')}/>,'stock-ledger');
  if(screen==='customers'&&organizationId)return shell(<CustomersPage supabase={supabase} organizationId={organizationId} onBack={()=>setScreen('dashboard')}/>,'customers');
