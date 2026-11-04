@@ -323,7 +323,8 @@ begin
     on conflict(issue_item_id) do update set quantity_issued=excluded.quantity_issued,quantity_used=excluded.quantity_used,quantity_returned=excluded.quantity_returned,quantity_unaccounted=excluded.quantity_unaccounted,unaccounted_reason=excluded.unaccounted_reason,verified_by=auth.uid(),verified_at=now();
     v_count:=v_count+1;
   end loop;
-  select count(distinct value->>'issue_item_id') into v_distinct from jsonb_array_elements(p_rows);\n  if v_count<>v_expected or v_distinct<>v_expected then raise exception 'all_issued_material_lines_must_be_reconciled_once'; end if;
+  select count(distinct value->>'issue_item_id') into v_distinct from jsonb_array_elements(p_rows);
+  if v_count<>v_expected or v_distinct<>v_expected then raise exception 'all_issued_material_lines_must_be_reconciled_once'; end if;
   update public.material_issues set status='reconciled' where work_order_id=v_wo.id and status<>'cancelled';
   update public.contractor_work_orders set status='completed',actual_end_date=coalesce(actual_end_date,current_date) where id=v_wo.id and status in ('active','on_hold');
   insert into public.audit_log(organization_id,user_id,action,entity_type,entity_id,details)
