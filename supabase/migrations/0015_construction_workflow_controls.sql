@@ -111,6 +111,10 @@ declare
   v_sum bigint := 0;
   v_bill_amount bigint;
   v_already bigint;
+  v_remaining bigint;
+  v_due bigint;
+  v_allocated bigint;
+  v_bill_row record;
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if p_amount_paise<=0 then raise exception 'receipt_amount_must_be_positive'; end if;
@@ -141,13 +145,38 @@ begin
     v_sum := v_sum+v_alloc;
   end loop;
 
-  if jsonb_array_length(p_allocations)>0 and v_sum<>p_amount_paise then
+  -- Default allocation is FIFO across oldest outstanding bills. Any excess
+  -- remains an unallocated contract receipt and is still visible as cash received.
+  if jsonb_array_length(p_allocations)=0 then
+    v_remaining := p_amount_paise;
+    for v_bill_row in
+      select id,amount_paise
+      from public.client_bills
+      where organization_id=p_organization_id and contract_id=p_contract_id
+        and status not in ('draft','rejected','cancelled')
+      order by bill_date,created_at
+      for update
+    loop
+      select coalesce(sum(a.amount_paise),0) into v_already
+      from public.client_receipt_allocations a
+      where a.organization_id=p_organization_id and a.bill_id=v_bill_row.id;
+      v_due := greatest(v_bill_row.amount_paise-v_already,0);
+      if v_due>0 and v_remaining>0 then
+        v_allocated := least(v_due,v_remaining);
+        insert into public.client_receipt_allocations(organization_id,receipt_id,bill_id,amount_paise)
+        values (p_organization_id,v_id,v_bill_row.id,v_allocated);
+        v_sum := v_sum+v_allocated;
+        v_remaining := v_remaining-v_allocated;
+      end if;
+      exit when v_remaining=0;
+    end loop;
+  elsif v_sum<>p_amount_paise then
     raise exception 'receipt_allocations_must_equal_receipt_amount';
   end if;
 
   insert into public.audit_log(organization_id,user_id,action,entity_type,entity_id,details)
   values (p_organization_id,auth.uid(),'client_receipt_recorded','client_receipt',v_id,
-    jsonb_build_object('contract_id',p_contract_id,'amount_paise',p_amount_paise,'allocated_paise',v_sum));
+    jsonb_build_object('contract_id',p_contract_id,'amount_paise',p_amount_paise,'allocated_paise',v_sum,'unallocated_paise',p_amount_paise-v_sum));
   return v_id;
 end;
 $$;
