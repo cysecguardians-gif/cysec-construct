@@ -1,6 +1,6 @@
 # Material Management System
 
-A reusable desktop application for inventory, customer, invoicing, and payment management. The product is designed to support multiple independent businesses while allowing each customer to own and manage their own Supabase project and business data.
+A reusable desktop application for tender/contract finance, material procurement and inventory, contractor work orders, and contractor settlement management. The product is designed to support multiple independent businesses while allowing each customer to own and manage their own Supabase project and business data.
 
 ## Product goals
 
@@ -8,8 +8,9 @@ A reusable desktop application for inventory, customer, invoicing, and payment m
 - Shared, cloud-hosted business data across multiple office computers.
 - Customer-owned Supabase project, authentication, database, and storage.
 - Inventory management with an auditable stock movement ledger.
-- Customer records and account balances.
-- Invoice creation, discounts, payment recording, and PDF/print output.
+- Client companies, awarded contracts, projects, client bills, receipts, and deductions.
+- Vendor procurement, material inventory, contractor-specific issue rates, and stock reconciliation.
+- Contractor/subcontractor work orders (fixed or percentage of total contract value), advances, returns, and final settlement.
 - Employee accounts, role-based access, login/session history, and audit trails.
 - Reusable multi-organization data model suitable for future deployments.
 
@@ -50,7 +51,7 @@ The desktop app may be configured with a Supabase project URL and a publishable 
 
 ## Current status
 
-This repository currently contains the product foundation and design documentation. Implementation will proceed in stages: architecture and data model, Supabase schema/security, authentication, inventory, customers, invoices, payments, reporting, and desktop packaging.
+The construction workflow is organized into four sections: (1) Tender / Contract Management and client finance, (2) Material Management and vendor procurement, (3) Contractor Management with work orders, daily material issues and advances, and (4) Contractor Closure with material reconciliation and settlement. Existing customer/invoice records remain available during the transition; the construction schema is additive.
 
 ## Security baseline
 
@@ -58,5 +59,6 @@ This repository currently contains the product foundation and design documentati
 - Keep only placeholder variable names in `.env.example`.
 - Use Supabase Auth for user identity.
 - Enforce organization data isolation using RLS.
-- Keep invoice, payment, and stock history auditable; prefer cancellation/reversal workflows over destructive deletion.
+- Keep contract, receipt, deduction, purchase, material issue/return, advance, settlement, and stock history auditable; prefer cancellation/reversal workflows over destructive deletion.
+- Perform stock and financial mutations through validated transactional PostgreSQL functions; do not write directly to sensitive ledger tables.
 - Treat client-side validation as usability support, not as a security boundary.
