@@ -18,7 +18,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if nullif(trim(p_name), '') is null then raise exception 'client_company_name_required'; end if;
   insert into public.client_companies(organization_id,name,gstin,pan,contact_person,phone,email,address,city,state,state_code,postal_code)
   values(p_organization_id,trim(p_name),nullif(trim(p_gstin),''),nullif(trim(p_pan),''),nullif(trim(p_contact_person),''),nullif(trim(p_phone),''),nullif(trim(p_email),''),nullif(trim(p_address),''),nullif(trim(p_city),''),nullif(trim(p_state),''),nullif(trim(p_state_code),''),nullif(trim(p_postal_code),''))
@@ -37,7 +37,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if not exists(select 1 from public.client_companies where id=p_client_company_id and organization_id=p_organization_id and is_active) then raise exception 'client_company_not_found_or_inactive'; end if;
   if nullif(trim(p_contract_number),'') is null or nullif(trim(p_title),'') is null then raise exception 'contract_number_and_title_required'; end if;
   if p_original_value_paise < 0 or coalesce(p_revised_value_paise,p_original_value_paise) < 0 then raise exception 'contract_value_invalid'; end if;
@@ -58,7 +58,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if not exists(select 1 from public.contracts where id=p_contract_id and organization_id=p_organization_id and status not in ('cancelled','closed')) then raise exception 'contract_not_found_or_closed'; end if;
   if nullif(trim(p_name),'') is null then raise exception 'project_name_required'; end if;
   insert into public.projects(organization_id,contract_id,project_code,name,site_address,site_contact,site_phone,start_date,expected_end_date,notes)
@@ -77,7 +77,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if nullif(trim(p_name),'') is null then raise exception 'vendor_name_required'; end if;
   insert into public.vendors(organization_id,name,gstin,pan,contact_person,phone,email,address,city,state,state_code,postal_code)
   values(p_organization_id,trim(p_name),nullif(trim(p_gstin),''),nullif(trim(p_pan),''),nullif(trim(p_contact_person),''),nullif(trim(p_phone),''),nullif(trim(p_email),''),nullif(trim(p_address),''),nullif(trim(p_city),''),nullif(trim(p_state),''),nullif(trim(p_state_code),''),nullif(trim(p_postal_code),''))
@@ -96,7 +96,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if nullif(trim(p_name),'') is null then raise exception 'contractor_name_required'; end if;
   insert into public.contractors(organization_id,name,contractor_type,gstin,pan,contact_person,phone,email,address,city,state,state_code,postal_code,notes)
   values(p_organization_id,trim(p_name),p_contractor_type,nullif(trim(p_gstin),''),nullif(trim(p_pan),''),nullif(trim(p_contact_person),''),nullif(trim(p_phone),''),nullif(trim(p_email),''),nullif(trim(p_address),''),nullif(trim(p_city),''),nullif(trim(p_state),''),nullif(trim(p_state_code),''),nullif(trim(p_postal_code),''),p_notes)
@@ -115,7 +115,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid; v_contract_value bigint; v_amount bigint;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if nullif(trim(p_po_number),'') is null then raise exception 'po_number_required'; end if;
   if not exists(select 1 from public.projects where id=p_project_id and organization_id=p_organization_id and status not in ('cancelled','closed')) then raise exception 'project_not_found_or_closed'; end if;
   if not exists(select 1 from public.contractors where id=p_contractor_id and organization_id=p_organization_id and is_active) then raise exception 'contractor_not_found_or_inactive'; end if;
@@ -151,7 +151,7 @@ declare v_purchase uuid; v_item jsonb; v_material public.materials%rowtype;
   v_qty numeric(14,3); v_cost bigint; v_rate numeric(5,2); v_subtotal bigint:=0;
   v_gst bigint:=0; v_line bigint; v_line_gst bigint; v_count integer:=0;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if not exists(select 1 from public.vendors where id=p_vendor_id and organization_id=p_organization_id and is_active) then raise exception 'vendor_not_found_or_inactive'; end if;
   if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'purchase_requires_items'; end if;
   if coalesce(p_other_charges_paise,0)<0 then raise exception 'other_charges_cannot_be_negative'; end if;
@@ -194,7 +194,7 @@ as $$
 declare v_issue uuid; v_wo public.contractor_work_orders%rowtype; v_item jsonb;
   v_material public.materials%rowtype; v_qty numeric(14,3); v_rate bigint; v_count integer:=0;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('active','on_hold') then raise exception 'work_order_not_active'; end if;
   if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'material_issue_requires_items'; end if;
@@ -235,7 +235,7 @@ declare v_return uuid; v_issue public.material_issues%rowtype; v_wo public.contr
   v_line public.material_issue_items%rowtype; v_qty numeric(14,3);
   v_already numeric(14,3); v_condition text; v_count integer:=0;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id;
   if not found or v_issue.status='cancelled' then raise exception 'material_issue_not_found_or_cancelled'; end if;
   select * into v_wo from public.contractor_work_orders where id=v_issue.work_order_id and organization_id=p_organization_id for update;
@@ -277,7 +277,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_wo public.contractor_work_orders%rowtype; v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('active','on_hold') then raise exception 'work_order_not_open_for_advance'; end if;
   if p_amount_paise<=0 then raise exception 'advance_amount_must_be_positive'; end if;
@@ -303,7 +303,7 @@ as $$
 declare v_wo public.contractor_work_orders%rowtype; v_row jsonb; v_line public.material_issue_items%rowtype;
   v_returned numeric(14,3); v_used numeric(14,3); v_unaccounted numeric(14,3); v_count integer:=0; v_expected integer; v_distinct integer;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('active','on_hold','completed','settlement_pending') then raise exception 'work_order_not_available_for_reconciliation'; end if;
   if p_rows is null or jsonb_typeof(p_rows)<>'array' then raise exception 'reconciliation_rows_must_be_array'; end if;
@@ -346,7 +346,7 @@ as $$
 declare v_wo public.contractor_work_orders%rowtype; v_id uuid; v_advances bigint:=0;
   v_material_charges bigint:=0; v_raw bigint; v_line record; v_returned numeric(14,3); v_charge_qty numeric(14,3);
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('completed','settlement_pending') then raise exception 'work_order_must_be_completed_before_settlement'; end if;
   if nullif(trim(p_settlement_number),'') is null then raise exception 'settlement_number_required'; end if;
@@ -399,7 +399,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_settlement public.contractor_settlements%rowtype;
 begin
-  perform public.require_org_admin(p_organization_id);
+  if not public.is_org_admin(p_organization_id) then raise exception 'organization_admin_required'; end if;
   select * into v_settlement from public.contractor_settlements where id=p_settlement_id and organization_id=p_organization_id for update;
   if not found or v_settlement.status<>'draft' then raise exception 'draft_settlement_not_found'; end if;
   update public.contractor_settlements set status=case when final_payable_paise=0 then 'paid' else 'approved' end,approved_by=auth.uid(),approved_at=now() where id=v_settlement.id;
@@ -417,7 +417,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_settlement public.contractor_settlements%rowtype; v_paid bigint; v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_settlement from public.contractor_settlements where id=p_settlement_id and organization_id=p_organization_id for update;
   if not found or v_settlement.status not in ('approved','partially_paid') then raise exception 'settlement_not_approved_or_already_paid'; end if;
   if p_amount_paise<=0 or p_payment_method not in ('cash','upi','bank_transfer','cheque','card','other') then raise exception 'invalid_settlement_payment'; end if;
