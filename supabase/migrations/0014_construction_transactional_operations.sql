@@ -153,7 +153,7 @@ declare v_purchase uuid; v_item jsonb; v_material public.materials%rowtype;
 begin
   perform public.require_org_member(p_organization_id);
   if not exists(select 1 from public.vendors where id=p_vendor_id and organization_id=p_organization_id and is_active) then raise exception 'vendor_not_found_or_inactive'; end if;
-  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'purchase_requires_items'; end if;
+  if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'purchase_requires_items'; end if;
   if coalesce(p_other_charges_paise,0)<0 then raise exception 'other_charges_cannot_be_negative'; end if;
   insert into public.material_purchases(organization_id,vendor_id,purchase_number,vendor_invoice_number,purchase_date,other_charges_paise,notes,created_by)
   values(p_organization_id,p_vendor_id,nullif(trim(p_purchase_number),''),nullif(trim(p_vendor_invoice_number),''),p_purchase_date,coalesce(p_other_charges_paise,0),p_notes,auth.uid())
@@ -197,7 +197,7 @@ begin
   perform public.require_org_member(p_organization_id);
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('active','on_hold') then raise exception 'work_order_not_active'; end if;
-  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'material_issue_requires_items'; end if;
+  if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'material_issue_requires_items'; end if;
   insert into public.material_issues(organization_id,work_order_id,contractor_id,project_id,issue_number,issue_date,notes,issued_by)
   values(p_organization_id,v_wo.id,v_wo.contractor_id,v_wo.project_id,nullif(trim(p_issue_number),''),p_issue_date,p_notes,auth.uid())
   returning id into v_issue;
@@ -238,7 +238,7 @@ begin
   perform public.require_org_member(p_organization_id);
   select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id for update;
   if not found or v_issue.status='cancelled' then raise exception 'material_issue_not_found_or_cancelled'; end if;
-  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'return_requires_items'; end if;
+  if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'return_requires_items'; end if;
   insert into public.material_returns(organization_id,issue_id,work_order_id,contractor_id,project_id,return_number,return_date,notes,received_by)
   values(p_organization_id,v_issue.id,v_issue.work_order_id,v_issue.contractor_id,v_issue.project_id,nullif(trim(p_return_number),''),p_return_date,p_notes,auth.uid())
   returning id into v_return;
@@ -276,7 +276,7 @@ declare v_wo public.contractor_work_orders%rowtype; v_id uuid;
 begin
   perform public.require_org_member(p_organization_id);
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
-  if not found or v_wo.status in ('settled','cancelled') then raise exception 'work_order_not_open_for_advance'; end if;
+  if not found or v_wo.status not in ('active','on_hold') then raise exception 'work_order_not_open_for_advance'; end if;
   if p_amount_paise<=0 then raise exception 'advance_amount_must_be_positive'; end if;
   if p_payment_method not in ('cash','upi','bank_transfer','cheque','card','other') then raise exception 'invalid_payment_method'; end if;
   insert into public.contractor_advances(organization_id,work_order_id,contractor_id,advance_date,amount_paise,payment_method,reference_number,notes,paid_by)
@@ -303,7 +303,7 @@ begin
   perform public.require_org_member(p_organization_id);
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('active','on_hold','completed','settlement_pending') then raise exception 'work_order_not_available_for_reconciliation'; end if;
-  if jsonb_typeof(p_rows)<>'array' then raise exception 'reconciliation_rows_must_be_array'; end if;
+  if p_rows is null or jsonb_typeof(p_rows)<>'array' then raise exception 'reconciliation_rows_must_be_array'; end if;
   select count(*) into v_expected from public.material_issue_items ii join public.material_issues mi on mi.id=ii.issue_id where mi.work_order_id=v_wo.id and mi.status<>'cancelled';
   for v_row in select value from jsonb_array_elements(p_rows) loop
     select ii.* into v_line from public.material_issue_items ii join public.material_issues mi on mi.id=ii.issue_id
