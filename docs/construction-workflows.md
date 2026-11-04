@@ -26,7 +26,7 @@ The `contract_finance_summary` view reports original/revised contract value, sub
 - A contractor can have multiple work orders (POs), linked to a contract and optionally a project.
 - Fixed work orders snapshot a fixed amount.
 - Percentage work orders snapshot the contract's revised total value and calculate the agreed work amount as total contract value multiplied by the agreed percentage.
-- Material issues are recorded against a PO. The latest received purchase rate is snapshotted as the reference purchase cost; the user-entered contractor rate is separately snapshotted and is used for settlement.
+- Material rates are maintained per contractor and material. On a new issue, the latest purchase rate is shown as the initial fallback; a previously saved contractor-specific rate is loaded when one exists. The user can change the rate, and the entered rate is saved for that contractor/material combination and snapshotted on the issue line.
 - Material issue reduces stock and appends the stock movement atomically.
 - Material returns reference original issue lines, restore stock and cannot exceed the unreturned/unconsumed issue quantity.
 - Cash/UPI/bank/etc. advances are recorded against the PO with date and payment reference.
