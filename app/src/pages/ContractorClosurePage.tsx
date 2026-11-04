@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type WorkOrder={work_order_id:string;contractor_id:string;contractor_name:string;project_id:string;po_number:string;payment_basis:string;agreed_percentage:number|null;basis_contract_value_paise:number;agreed_work_amount_paise:number;total_advances_paise:number;status:string};
-type IssueLine={id:string;issue_id:string;description_snapshot:string;unit_name_snapshot:string|null;quantity_issued:number;contractor_unit_rate_paise:number;material_issues:{work_order_id:string;issue_date:string;issue_number:string|null};material_return_items:{quantity_returned:number;condition:string}[]};
+type IssueLine={id:string;issue_id:string;description_snapshot:string;unit_name_snapshot:string|null;quantity_issued:number;contractor_unit_rate_paise:number;material_issues:{work_order_id:string;issue_date:string;issue_number:string|null};material_return_items:{quantity_returned:number;condition:string}[];material_reconciliations?:{quantity_used:number;quantity_unaccounted:number;unaccounted_reason:string|null}[]};
 type Settlement={id:string;work_order_id:string;settlement_number:string;settlement_date:string;agreed_work_amount_paise:number;material_charges_paise:number;advances_adjusted_paise:number;other_deductions_paise:number;adjustments_paise:number;final_payable_paise:number;recovery_due_paise:number;status:string};
 type ReconcileForm={used:string;reason:string};
 const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2});
@@ -29,12 +29,12 @@ export default function ContractorClosurePage({supabase,organizationId,onBack}:{
  async function selectWorkOrder(id:string){
   setSelectedId(id);setError('');setMessage('');setLines([]);setReconcile({});
   if(!id)return;
-  const {data,error:e}=await supabase.from('material_issue_items').select('id,issue_id,description_snapshot,unit_name_snapshot,quantity_issued,contractor_unit_rate_paise,material_issues!inner(work_order_id,issue_date,issue_number),material_return_items(quantity_returned,condition)').eq('organization_id',organizationId).eq('material_issues.work_order_id',id);
+  const {data,error:e}=await supabase.from('material_issue_items').select('id,issue_id,description_snapshot,unit_name_snapshot,quantity_issued,contractor_unit_rate_paise,material_issues!inner(work_order_id,issue_date,issue_number),material_return_items(quantity_returned,condition),material_reconciliations(quantity_used,quantity_unaccounted,unaccounted_reason)').eq('organization_id',organizationId).eq('material_issues.work_order_id',id);
   if(e){setError(e.message);return;}
   const rows=(data??[]) as unknown as IssueLine[];
   setLines(rows);
   const form:Record<string,ReconcileForm>={};
-  for(const row of rows){const returned=row.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;form[row.id]={used:'',reason:''};}
+  for(const row of rows){const returned=row.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;const saved=row.material_reconciliations?.[0];form[row.id]={used:saved?String(saved.quantity_used):'',reason:saved?.unaccounted_reason||''};}
   setReconcile(form);
  }
  const totals=useMemo(()=>lines.reduce((acc,line)=>{const returned=line.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;const used=Number(reconcile[line.id]?.used||0);const unaccounted=Math.max(Number(line.quantity_issued)-returned-used,0);acc.issued+=Number(line.quantity_issued);acc.returned+=returned;acc.used+=used;acc.unaccounted+=unaccounted;acc.charge+=Math.max(Number(line.quantity_issued)-returned,0)*Number(line.contractor_unit_rate_paise);return acc;},{issued:0,returned:0,used:0,unaccounted:0,charge:0}),[lines,reconcile]);
