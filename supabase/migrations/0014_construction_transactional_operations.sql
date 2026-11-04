@@ -209,9 +209,11 @@ declare
   v_name text;
   v_unit text;
   v_stock numeric;
+  v_contractor uuid;
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
-  if not exists(select 1 from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id and status='active') then
+  select contractor_id into v_contractor from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id and status='active' for share;
+  if not found then
     raise exception 'active_work_order_not_found';
   end if;
   if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'issue_items_required'; end if;
@@ -240,6 +242,11 @@ begin
     where pi.organization_id=p_organization_id and pi.material_id=v_material and mp.status='received'
     order by mp.purchase_date desc,mp.created_at desc limit 1;
     v_cost := coalesce(v_cost,0);
+
+    insert into public.contractor_material_rates(organization_id,contractor_id,material_id,unit_rate_paise)
+    values (p_organization_id,v_contractor,v_material,v_rate)
+    on conflict (organization_id,contractor_id,material_id)
+    do update set unit_rate_paise=excluded.unit_rate_paise,updated_at=now();
 
     insert into public.material_issue_items(
       organization_id,issue_id,material_id,material_name_snapshot,unit_name_snapshot,
