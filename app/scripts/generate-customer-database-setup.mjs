@@ -6,6 +6,7 @@ const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const migrationDir = path.resolve(appDir, '..', 'supabase', 'migrations');
 const outputDir = path.join(appDir, 'src', 'generated');
 const outputFile = path.join(outputDir, 'customerDatabaseSetup.json');
+const upgradeOutputFile = path.join(outputDir, 'constructionWorkflowUpgrade.json');
 
 const migrationFiles = [
   '0001_initial_schema.sql',
@@ -25,7 +26,9 @@ const migrationFiles = [
   '0015_client_contract_finance.sql',
 ];
 
+const upgradeMigrationFiles = migrationFiles.filter(file => /^001[3-5]_/.test(file));
 const sections = [];
+const upgradeSections = [];
 for (const file of migrationFiles) {
   const source = await fs.readFile(path.join(migrationDir, file), 'utf8');
   sections.push(`-- Material Management System database setup\n-- Internal migration: ${file}\n-- This file is bundled into the desktop application for customer database initialization.\n\n${source.trim()}`);
