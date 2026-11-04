@@ -94,7 +94,7 @@ Retention is not conflated with ordinary deductions. Client receipts may be link
 
 - All construction tables are organization-scoped and protected by RLS.
 - This foundation migration exposes read access to organization members but deliberately has no direct table INSERT/UPDATE/DELETE policies.
-- Subsequent migrations must add narrowly scoped SECURITY DEFINER RPCs for validated transactional writes.
+- Migrations 0014 and 0015 expose narrowly scoped SECURITY DEFINER RPCs for validated transactional writes.
 - Stock purchase, material issue, usable material return, advance, reconciliation, settlement approval, settlement payment, client receipt and deduction operations must be atomic.
 - Financial and stock history is append-oriented. Corrections should use cancellation/reversal records, not destructive deletion.
 - Monetary values are integer paise; quantities use numeric(14,3).
@@ -102,6 +102,8 @@ Retention is not conflated with ordinary deductions. Client receipts may be link
 ## Migration rollout
 
 - `0013_construction_workflow_foundation.sql` adds the construction data model and finance summary views.
-- The customer database setup generator bundles this migration for new customer installations.
+- `0014_construction_transactional_operations.sql` adds atomic vendor purchase, contractor issue/return, advance, reconciliation and settlement operations.
+- `0015_client_contract_finance.sql` adds client bill, receipt and deduction operations.
+- The customer database setup generator bundles migrations 0013–0015 for new customer installations and generates a separate incremental upgrade script for existing v12 databases.
 - Existing customer Supabase projects must apply new numbered migrations manually, in order, using the SQL Editor.
 - Do not rerun migrations 0001–0012 on an existing database.
