@@ -13,7 +13,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if not exists(select 1 from public.contracts where id=p_contract_id and organization_id=p_organization_id and status not in ('cancelled')) then raise exception 'contract_not_found_or_cancelled'; end if;
   if nullif(trim(p_bill_number),'') is null or p_amount_claimed_paise<=0 then raise exception 'bill_number_and_positive_amount_required'; end if;
   if p_status not in ('draft','submitted','approved') then raise exception 'invalid_initial_bill_status'; end if;
@@ -35,7 +35,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid; v_bill public.client_bills%rowtype; v_received bigint; v_deducted bigint;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if not exists(select 1 from public.contracts where id=p_contract_id and organization_id=p_organization_id) then raise exception 'contract_not_found'; end if;
   if p_amount_paise<=0 then raise exception 'receipt_amount_must_be_positive'; end if;
   if p_payment_method not in ('cash','upi','bank_transfer','cheque','card','other') then raise exception 'invalid_payment_method'; end if;
@@ -68,7 +68,7 @@ language plpgsql security definer set search_path = public
 as $$
 declare v_id uuid; v_bill public.client_bills%rowtype; v_received bigint; v_deducted bigint;
 begin
-  perform public.require_org_member(p_organization_id);
+  if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if not exists(select 1 from public.contracts where id=p_contract_id and organization_id=p_organization_id) then raise exception 'contract_not_found'; end if;
   if p_amount_paise<=0 then raise exception 'deduction_amount_must_be_positive'; end if;
   if p_deduction_type not in ('tds','retention','security_deposit','penalty','material_recovery','other') then raise exception 'invalid_deduction_type'; end if;
