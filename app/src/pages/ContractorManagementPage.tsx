@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Contractor={id:string;name:string;contractor_type:string;phone:string|null;is_active:boolean};
@@ -16,7 +16,6 @@ export default function ContractorManagementPage({supabase,organizationId,onBack
  const [po,setPo]=useState(''),[contractId,setContractId]=useState(''),[projectId,setProjectId]=useState(''),[contractorId,setContractorId]=useState(''),[basis,setBasis]=useState('fixed'),[fixed,setFixed]=useState(''),[percentage,setPercentage]=useState(''),[description,setDescription]=useState('');
  const [advancePo,setAdvancePo]=useState(''),[advanceAmount,setAdvanceAmount]=useState(''),[advanceMethod,setAdvanceMethod]=useState('cash');
  const [issuePo,setIssuePo]=useState(''),[issueNo,setIssueNo]=useState(''),[issueMaterial,setIssueMaterial]=useState(''),[issueQty,setIssueQty]=useState(''),[purchaseRate,setPurchaseRate]=useState('0'),[contractorRate,setContractorRate]=useState('0');
- const purchaseDefaults=useMemo(()=>new Map<string,number>(),[]);
  async function load(){const [c,k,p,m,w]=await Promise.all([
   supabase.from('contractors').select('id,name,contractor_type,phone,is_active').eq('organization_id',organizationId).eq('is_active',true).order('name'),
   supabase.from('contracts').select('id,contract_number,title,revised_value_paise').eq('organization_id',organizationId).eq('status','active').order('contract_number'),
@@ -33,7 +32,6 @@ export default function ContractorManagementPage({supabase,organizationId,onBack
  async function addAdvance(e:React.FormEvent){e.preventDefault();await submit(()=>supabase.rpc('record_contractor_advance',{p_organization_id:organizationId,p_work_order_id:advancePo,p_advance_date:new Date().toISOString().slice(0,10),p_amount_paise:paise(advanceAmount),p_payment_method:advanceMethod,p_reference_number:null,p_notes:null}),'Contractor advance recorded.');setAdvanceAmount('')}
  async function issueMaterial(e:React.FormEvent){e.preventDefault();await submit(()=>supabase.rpc('issue_contractor_materials',{p_organization_id:organizationId,p_work_order_id:issuePo,p_issue_number:issueNo,p_issue_date:new Date().toISOString().slice(0,10),p_items:[{material_id:issueMaterial,quantity:Number(issueQty),contractor_unit_rate_paise:paise(contractorRate)}],p_notes:null}),'Material issued to contractor.');setIssueNo('');setIssueQty('')}
  const filteredProjects=projects.filter(p=>p.contract_id===contractId);
- const selectedMaterial=materials.find(m=>m.id===issueMaterial);
  return <main className="main-content"><header className="topbar"><div><p className="eyebrow">Section 3</p><h1>Contractor Management</h1><p className="muted">Contractors, contractor POs, daily material issues and advances.</p></div><button className="secondary" onClick={onBack}>Back to overview</button></header>
  {error&&<div className="alert error">{error}</div>}{notice&&<div className="alert success">{notice}</div>}
  <section className="metric-grid"><Metric label="Active contractors" value={String(contractors.length)}/><Metric label="Work orders" value={String(orders.length)}/><Metric label="Active POs" value={String(orders.filter(x=>x.status==='active').length)}/><Metric label="Agreed work value" value={money.format(orders.reduce((s,x)=>s+Number(x.agreed_work_amount_paise),0)/100)}/></section>
