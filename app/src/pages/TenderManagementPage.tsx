@@ -1,0 +1,86 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type Company = { id: string; name: string; gstin: string | null; is_active: boolean };
+type Contract = { contract_id: string; client_company_id: string; client_company_name: string; contract_number: string; title: string; original_value_paise: number; revised_value_paise: number; total_billed_paise: number; total_received_paise: number; total_deductions_paise: number; retention_paise: number; pending_receivable_paise: number; unbilled_contract_value_paise: number };
+type Project = { id: string; contract_id: string; name: string; status: string };
+const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
+const paise = (v: string) => Math.round(Number(v || 0) * 100);
+const rupees = (v: number) => money.format(Number(v || 0) / 100);
+
+export default function TenderManagementPage({ supabase, organizationId, onBack }: { supabase: SupabaseClient; organizationId: string; onBack: () => void }) {
+  const [tab, setTab] = useState<'contracts' | 'finance' | 'projects'>('contracts');
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [search, setSearch] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [modal, setModal] = useState<'company' | 'contract' | 'project' | 'bill' | 'receipt' | 'deduction' | null>(null);
+  const [selectedContract, setSelectedContract] = useState('');
+  const [companyForm, setCompanyForm] = useState({ name: '', gstin: '', phone: '', email: '' });
+  const [contractForm, setContractForm] = useState({ client: '', number: '', title: '', value: '', date: new Date().toISOString().slice(0, 10), type: 'tender' });
+  const [projectForm, setProjectForm] = useState({ contract: '', name: '', code: '', site: '' });
+  const [billForm, setBillForm] = useState({ number: '', amount: '', date: new Date().toISOString().slice(0, 10), status: 'submitted' });
+  const [receiptForm, setReceiptForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), method: 'bank_transfer', reference: '', bill: '' });
+  const [deductionForm, setDeductionForm] = useState({ amount: '', date: new Date().toISOString().slice(0, 10), type: 'tds', reference: '', bill: '' });
+
+  async function load() {
+    setBusy(true); setError('');
+    const [c, f, p] = await Promise.all([
+      supabase.from('client_companies').select('id,name,gstin,is_active').eq('organization_id', organizationId).order('name'),
+      supabase.from('contract_finance_summary').select('*').eq('organization_id', organizationId).order('contract_number'),
+      supabase.from('projects').select('id,contract_id,name,status').eq('organization_id', organizationId).order('name'),
+    ]);
+    if (c.error || f.error || p.error) setError(c.error?.message || f.error?.message || p.error?.message || 'Could not load contract data.');
+    else { setCompanies((c.data ?? []) as Company[]); setContracts((f.data ?? []) as Contract[]); setProjects((p.data ?? []) as Project[]); }
+    setBusy(false);
+  }
+  useEffect(() => { void load(); }, [organizationId]);
+  const filtered = useMemo(() => { const q = search.trim().toLowerCase(); return contracts.filter(c => !q || `${c.client_company_name} ${c.contract_number} ${c.title}`.toLowerCase().includes(q)); }, [contracts, search]);
+  const selected = contracts.find(c => c.contract_id === selectedContract);
+
+  async function runRpc(name: string, args: Record<string, unknown>) {
+    setError(''); setBusy(true);
+    const { error: e } = await supabase.rpc(name, args);
+    if (e) setError(e.message);
+    else { setModal(null); await load(); }
+    setBusy(false);
+  }
+  async function saveCompany(e: React.FormEvent) { e.preventDefault(); await runRpc('create_client_company', { p_organization_id: organizationId, p_name: companyForm.name, p_gstin: companyForm.gstin || null, p_phone: companyForm.phone || null, p_email: companyForm.email || null }); }
+  async function saveContract(e: React.FormEvent) { e.preventDefault(); await runRpc('create_contract', { p_organization_id: organizationId, p_client_company_id: contractForm.client, p_contract_number: contractForm.number, p_title: contractForm.title, p_original_value_paise: paise(contractForm.value), p_revised_value_paise: paise(contractForm.value), p_contract_type: contractForm.type, p_contract_date: contractForm.date }); }
+  async function saveProject(e: React.FormEvent) { e.preventDefault(); await runRpc('create_project', { p_organization_id: organizationId, p_contract_id: projectForm.contract, p_name: projectForm.name, p_project_code: projectForm.code || null, p_site_address: projectForm.site || null }); }
+  async function saveBill(e: React.FormEvent) { e.preventDefault(); if (!selectedContract) return; await runRpc('create_client_bill', { p_organization_id: organizationId, p_contract_id: selectedContract, p_bill_number: billForm.number, p_amount_claimed_paise: paise(billForm.amount), p_bill_date: billForm.date, p_status: billForm.status }); }
+  async function saveReceipt(e: React.FormEvent) { e.preventDefault(); if (!selectedContract) return; await runRpc('record_client_receipt', { p_organization_id: organizationId, p_contract_id: selectedContract, p_amount_paise: paise(receiptForm.amount), p_bill_id: receiptForm.bill || null, p_receipt_date: receiptForm.date, p_payment_method: receiptForm.method, p_reference_number: receiptForm.reference || null }); }
+  async function saveDeduction(e: React.FormEvent) { e.preventDefault(); if (!selectedContract) return; await runRpc('record_client_deduction', { p_organization_id: organizationId, p_contract_id: selectedContract, p_deduction_type: deductionForm.type, p_amount_paise: paise(deductionForm.amount), p_bill_id: deductionForm.bill || null, p_deduction_date: deductionForm.date, p_reference_number: deductionForm.reference || null }); }
+
+  return <main className="main-content">
+    <header className="topbar"><div><button className="back-link" onClick={onBack}>← Overview</button><p className="eyebrow">Section 01</p><h1>Tender & Contract Management</h1></div><button className="primary compact" onClick={() => setModal('company')}>Add client company</button></header>
+    <section className="metric-grid">
+      <div className="metric"><span>Contracts</span><strong>{contracts.length}</strong></div>
+      <div className="metric"><span>Total contract value</span><strong>{rupees(contracts.reduce((s,c)=>s+Number(c.revised_value_paise),0))}</strong></div>
+      <div className="metric"><span>Received</span><strong>{rupees(contracts.reduce((s,c)=>s+Number(c.total_received_paise),0))}</strong></div>
+      <div className="metric"><span>Pending receivables</span><strong>{rupees(contracts.reduce((s,c)=>s+Number(c.pending_receivable_paise),0))}</strong></div>
+    </section>
+    <div className="tab-row">
+      <button className={tab==='contracts'?'tab-active':''} onClick={()=>setTab('contracts')}>Contracts</button>
+      <button className={tab==='finance'?'tab-active':''} onClick={()=>setTab('finance')}>Finance overview</button>
+      <button className={tab==='projects'?'tab-active':''} onClick={()=>setTab('projects')}>Projects</button>
+    </div>
+    {error && <div className="alert error page-alert">{error}</div>}
+    {tab !== 'projects' && <section className="page-toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client, contract number or project…"/><span>{filtered.length} contracts</span><button className="primary compact" onClick={()=>setModal('contract')} disabled={!companies.length}>Add contract</button></section>}
+    {tab==='contracts' && <section className="table-card">{busy?<div className="table-empty">Loading contracts…</div>:filtered.length===0?<div className="table-empty"><strong>No contracts yet</strong><span>Add a client company, then create its first contract.</span></div>:<table><thead><tr><th>Contract</th><th>Client company</th><th>Contract value</th><th>Received</th><th>Pending</th><th></th></tr></thead><tbody>{filtered.map(c=><tr key={c.contract_id}><td><strong>{c.contract_number}</strong><small>{c.title}</small></td><td>{c.client_company_name}</td><td>{rupees(c.revised_value_paise)}</td><td>{rupees(c.total_received_paise)}</td><td><strong>{rupees(c.pending_receivable_paise)}</strong></td><td><div className="row-actions"><button onClick={()=>{setSelectedContract(c.contract_id);setModal('bill')}}>Add bill</button><button onClick={()=>{setSelectedContract(c.contract_id);setModal('receipt')}}>Receipt</button><button onClick={()=>{setSelectedContract(c.contract_id);setModal('deduction')}}>Deduction</button></div></td></tr>)}</tbody></table>}</section>}
+    {tab==='finance' && <section className="table-card"><table><thead><tr><th>Contract</th><th>Value</th><th>Claimed</th><th>Received</th><th>Deductions</th><th>Retention</th><th>Pending</th><th>Unbilled</th></tr></thead><tbody>{filtered.map(c=><tr key={c.contract_id}><td><strong>{c.contract_number}</strong><small>{c.client_company_name} · {c.title}</small></td><td>{rupees(c.revised_value_paise)}</td><td>{rupees(c.total_billed_paise)}</td><td>{rupees(c.total_received_paise)}</td><td>{rupees(c.total_deductions_paise)}</td><td>{rupees(c.retention_paise)}</td><td><strong>{rupees(c.pending_receivable_paise)}</strong></td><td>{rupees(c.unbilled_contract_value_paise)}</td></tr>)}</tbody></table></section>}
+    {tab==='projects' && <><section className="page-toolbar"><span>{projects.length} projects</span><button className="primary compact" onClick={()=>setModal('project')} disabled={!contracts.length}>Add project</button></section><section className="table-card"><table><thead><tr><th>Project</th><th>Contract</th><th>Status</th></tr></thead><tbody>{projects.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.project_code||'No project code'}</small></td><td>{contracts.find(c=>c.contract_id===p.contract_id)?.contract_number||'—'}</td><td>{p.status}</td></tr>)}</tbody></table></section></>}
+    {modal && <div className="modal-backdrop"><div className="modal"><div className="modal-header"><h2>{({company:'Add client company',contract:'Create contract',project:'Create project',bill:'Submit client bill / claim',receipt:'Record client receipt',deduction:'Record tender deduction'} as const)[modal]}</h2><button onClick={()=>setModal(null)}>×</button></div>
+      {modal==='company' && <form className="stack" onSubmit={saveCompany}><label>Company name<input value={companyForm.name} onChange={e=>setCompanyForm({...companyForm,name:e.target.value})} required/></label><div className="two-col wide"><label>GSTIN<input value={companyForm.gstin} onChange={e=>setCompanyForm({...companyForm,gstin:e.target.value.toUpperCase()})}/></label><label>Phone<input value={companyForm.phone} onChange={e=>setCompanyForm({...companyForm,phone:e.target.value})}/></label></div><label>Email<input type="email" value={companyForm.email} onChange={e=>setCompanyForm({...companyForm,email:e.target.value})}/></label><Actions busy={busy} onCancel={()=>setModal(null)}/></form>}
+      {modal==='contract' && <form className="stack" onSubmit={saveContract}><label>Client company<select value={contractForm.client} onChange={e=>setContractForm({...contractForm,client:e.target.value})} required><option value="">Select company</option>{companies.filter(c=>c.is_active).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Contract / tender number<input value={contractForm.number} onChange={e=>setContractForm({...contractForm,number:e.target.value})} required/></label><label>Contract title<input value={contractForm.title} onChange={e=>setContractForm({...contractForm,title:e.target.value})} required/></label><div className="two-col wide"><label>Contract value (₹)<input type="number" min="0" step="0.01" value={contractForm.value} onChange={e=>setContractForm({...contractForm,value:e.target.value})} required/></label><label>Contract date<input type="date" value={contractForm.date} onChange={e=>setContractForm({...contractForm,date:e.target.value})}/></label></div><label>Type<select value={contractForm.type} onChange={e=>setContractForm({...contractForm,type:e.target.value})}><option value="tender">Tender</option><option value="direct_contract">Direct contract</option><option value="work_order">Work order</option><option value="other">Other</option></select></label><Actions busy={busy} onCancel={()=>setModal(null)}/></form>}
+      {modal==='project' && <form className="stack" onSubmit={saveProject}><label>Contract<select value={projectForm.contract} onChange={e=>setProjectForm({...projectForm,contract:e.target.value})} required><option value="">Select contract</option>{contracts.map(c=><option key={c.contract_id} value={c.contract_id}>{c.contract_number} — {c.title}</option>)}</select></label><label>Project / site name<input value={projectForm.name} onChange={e=>setProjectForm({...projectForm,name:e.target.value})} required/></label><div className="two-col wide"><label>Project code<input value={projectForm.code} onChange={e=>setProjectForm({...projectForm,code:e.target.value})}/></label><label>Site address<input value={projectForm.site} onChange={e=>setProjectForm({...projectForm,site:e.target.value})}/></label></div><Actions busy={busy} onCancel={()=>setModal(null)}/></form>}
+      {modal==='bill' && <form className="stack" onSubmit={saveBill}><p className="hint">Contract: {selected?.contract_number} · {selected?.client_company_name}</p><label>Bill / claim number<input value={billForm.number} onChange={e=>setBillForm({...billForm,number:e.target.value})} required/></label><div className="two-col wide"><label>Claim amount (₹)<input type="number" min="0.01" step="0.01" value={billForm.amount} onChange={e=>setBillForm({...billForm,amount:e.target.value})} required/></label><label>Bill date<input type="date" value={billForm.date} onChange={e=>setBillForm({...billForm,date:e.target.value})}/></label></div><label>Initial status<select value={billForm.status} onChange={e=>setBillForm({...billForm,status:e.target.value})}><option value="submitted">Submitted</option><option value="draft">Draft</option><option value="approved">Approved</option></select></label><Actions busy={busy} onCancel={()=>setModal(null)}/></form>}
+      {modal==='receipt' && <form className="stack" onSubmit={saveReceipt}><p className="hint">Contract: {selected?.contract_number}</p><label>Receipt amount (₹)<input type="number" min="0.01" step="0.01" value={receiptForm.amount} onChange={e=>setReceiptForm({...receiptForm,amount:e.target.value})} required/></label><div className="two-col wide"><label>Date<input type="date" value={receiptForm.date} onChange={e=>setReceiptForm({...receiptForm,date:e.target.value})}/></label><label>Payment method<select value={receiptForm.method} onChange={e=>setReceiptForm({...receiptForm,method:e.target.value})}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="cheque">Cheque</option><option value="cash">Cash</option><option value="card">Card</option><option value="other">Other</option></select></label></div><label>Reference number<input value={receiptForm.reference} onChange={e=>setReceiptForm({...receiptForm,reference:e.target.value})}/></label><label>Bill (optional)<select value={receiptForm.bill} onChange={e=>setReceiptForm({...receiptForm,bill:e.target.value})}><option value="">Contract-level receipt</option></select></label><Actions busy={busy} onCancel={()=>setModal(null)}/></form>}
+      {modal==='deduction' && <form className="stack" onSubmit={saveDeduction}><p className="hint">Contract: {selected?.contract_number}</p><label>Deduction amount (₹)<input type="number" min="0.01" step="0.01" value={deductionForm.amount} onChange={e=>setDeductionForm({...deductionForm,amount:e.target.value})} required/></label><div className="two-col wide"><label>Date<input type="date" value={deductionForm.date} onChange={e=>setDeductionForm({...deductionForm,date:e.target.value})}/></label><label>Deduction type<select value={deductionForm.type} onChange={e=>setDeductionForm({...deductionForm,type:e.target.value})}><option value="tds">TDS</option><option value="retention">Retention</option><option value="security_deposit">Security deposit</option><option value="penalty">Penalty</option><option value="material_recovery">Material recovery</option><option value="other">Other</option></select></label></div><label>Reference<input value={deductionForm.reference} onChange={e=>setDeductionForm({...deductionForm,reference:e.target.value})}/></label><Actions busy={busy} onCancel={()=>setModal(null)}/></form>}
+    </div></div>}
+  </main>;
+}
+
+function Actions({ busy, onCancel }: { busy: boolean; onCancel: () => void }) { return <div className="modal-actions"><button type="button" onClick={onCancel}>Cancel</button><button className="primary compact" disabled={busy}>{busy ? 'Saving…' : 'Save'}</button></div>; }
