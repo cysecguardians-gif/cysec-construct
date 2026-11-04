@@ -1,0 +1,61 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+type WorkOrder={work_order_id:string;contractor_id:string;contractor_name:string;project_id:string;po_number:string;payment_basis:string;agreed_percentage:number|null;basis_contract_value_paise:number;agreed_work_amount_paise:number;total_advances_paise:number;status:string};
+type IssueLine={id:string;issue_id:string;description_snapshot:string;unit_name_snapshot:string|null;quantity_issued:number;contractor_unit_rate_paise:number;material_issues:{work_order_id:string;issue_date:string;issue_number:string|null};material_return_items:{quantity_returned:number;condition:string}[]};
+type Settlement={id:string;work_order_id:string;settlement_number:string;settlement_date:string;agreed_work_amount_paise:number;material_charges_paise:number;advances_adjusted_paise:number;other_deductions_paise:number;adjustments_paise:number;final_payable_paise:number;recovery_due_paise:number;status:string};
+type ReconcileForm={used:string;reason:string};
+const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2});
+const paise=(v:string)=>Math.round(Number(v||0)*100);
+const inr=(v:number)=>money.format(Number(v||0)/100);
+
+export default function ContractorClosurePage({supabase,organizationId,onBack}:{supabase:SupabaseClient;organizationId:string;onBack:()=>void}){
+ const [workOrders,setWorkOrders]=useState<WorkOrder[]>([]),[settlements,setSettlements]=useState<Settlement[]>([]);
+ const [selectedId,setSelectedId]=useState(''),[lines,setLines]=useState<IssueLine[]>([]),[reconcile,setReconcile]=useState<Record<string,ReconcileForm>>({});
+ const [busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+ const [settlementNumber,setSettlementNumber]=useState(''),[otherDeductions,setOtherDeductions]=useState('0'),[adjustments,setAdjustments]=useState('0');
+ const [payment,setPayment]=useState({amount:'',date:new Date().toISOString().slice(0,10),method:'bank_transfer',reference:''});
+ async function load(){
+  const [w,s]=await Promise.all([
+   supabase.from('contractor_work_order_summary').select('*').eq('organization_id',organizationId).in('status',['completed','settlement_pending','settled']).order('po_number'),
+   supabase.from('contractor_settlements').select('*').eq('organization_id',organizationId).order('settlement_date',{ascending:false}),
+  ]);
+  if(w.error||s.error){setError(w.error?.message||s.error?.message||'Could not load closure data.');return;}
+  setWorkOrders((w.data??[]) as WorkOrder[]);setSettlements((s.data??[]) as Settlement[]);
+ }
+ useEffect(()=>{void load()},[organizationId]);
+ const selected=workOrders.find(w=>w.work_order_id===selectedId);
+ const settlement=settlements.find(s=>s.work_order_id===selectedId);
+ async function selectWorkOrder(id:string){
+  setSelectedId(id);setError('');setMessage('');setLines([]);setReconcile({});
+  if(!id)return;
+  const {data,error:e}=await supabase.from('material_issue_items').select('id,issue_id,description_snapshot,unit_name_snapshot,quantity_issued,contractor_unit_rate_paise,material_issues!inner(work_order_id,issue_date,issue_number),material_return_items(quantity_returned,condition)').eq('organization_id',organizationId).eq('material_issues.work_order_id',id);
+  if(e){setError(e.message);return;}
+  const rows=(data??[]) as unknown as IssueLine[];
+  setLines(rows);
+  const form:Record<string,ReconcileForm>={};
+  for(const row of rows){const returned=row.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;form[row.id]={used:String(Math.max(Number(row.quantity_issued)-returned,0)),reason:''};}
+  setReconcile(form);
+ }
+ const totals=useMemo(()=>lines.reduce((acc,line)=>{const returned=line.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;const used=Number(reconcile[line.id]?.used||0);const unaccounted=Math.max(Number(line.quantity_issued)-returned-used,0);acc.issued+=Number(line.quantity_issued);acc.returned+=returned;acc.used+=used;acc.unaccounted+=unaccounted;acc.charge+=Math.max(Number(line.quantity_issued)-returned,0)*Number(line.contractor_unit_rate_paise);return acc;},{issued:0,returned:0,used:0,unaccounted:0,charge:0}),[lines,reconcile]);
+ async function run(name:string,args:Record<string,unknown>){setBusy(true);setError('');setMessage('');const {data,error:e}=await supabase.rpc(name,args);if(e)setError(e.message);else{setMessage(typeof data==='string'?data:'Operation completed successfully.');await load();if(name==='reconcile_contractor_materials')await selectWorkOrder(selectedId)}setBusy(false)}
+ async function saveReconciliation(){if(!selectedId)return;const rows=lines.map(l=>({issue_item_id:l.id,quantity_used:Number(reconcile[l.id]?.used||0),unaccounted_reason:reconcile[l.id]?.reason||null}));await run('reconcile_contractor_materials',{p_organization_id:organizationId,p_work_order_id:selectedId,p_rows:rows})}
+ async function createSettlement(e:React.FormEvent){e.preventDefault();if(!selectedId)return;await run('create_contractor_settlement',{p_organization_id:organizationId,p_work_order_id:selectedId,p_settlement_number:settlementNumber,p_other_deductions_paise:paise(otherDeductions),p_adjustments_paise:paise(adjustments)})}
+ async function recordPayment(e:React.FormEvent){e.preventDefault();if(!settlement)return;await run('record_contractor_settlement_payment',{p_organization_id:organizationId,p_settlement_id:settlement.id,p_amount_paise:paise(payment.amount),p_payment_date:payment.date,p_payment_method:payment.method,p_reference_number:payment.reference||null})}
+ async function approve(){if(!settlement)return;await run('approve_contractor_settlement',{p_organization_id:organizationId,p_settlement_id:settlement.id})}
+ const reconciled=lines.length===0||lines.every(l=>Number(reconcile[l.id]?.used||0)+Number(l.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0)<=Number(l.quantity_issued));
+ return <main className="main-content">
+  <header className="topbar"><div><button className="back-link" onClick={onBack}>← Overview</button><p className="eyebrow">Section 04</p><h1>Contractor Closure & Settlement</h1></div></header>
+  <p className="hint">Select a completed work order to reconcile every issued material, prepare the settlement, approve it and record final payments.</p>
+  {error&&<div className="alert error page-alert">{error}</div>}{message&&<div className="alert success page-alert">{message}</div>}
+  <section className="page-toolbar"><label style={{minWidth:360}}>Contractor work order<select value={selectedId} onChange={e=>void selectWorkOrder(e.target.value)}><option value="">Select completed PO</option>{workOrders.map(w=><option key={w.work_order_id} value={w.work_order_id}>{w.po_number} · {w.contractor_name} · {w.status}</option>)}</select></label><span>{workOrders.length} work orders ready for closure</span></section>
+  {selected&&<><section className="metric-grid"><div className="metric"><span>Agreed work amount</span><strong>{inr(selected.agreed_work_amount_paise)}</strong></div><div className="metric"><span>Materials charge preview</span><strong>{inr(totals.charge)}</strong></div><div className="metric"><span>Advances</span><strong>{inr(selected.total_advances_paise)}</strong></div><div className="metric"><span>Unaccounted quantity</span><strong>{totals.unaccounted.toLocaleString('en-IN',{maximumFractionDigits:3})}</strong></div></section>
+   <section className="table-card"><h3>Material reconciliation</h3><p className="hint">Returned quantity is calculated from actual return entries. Enter the quantity used; any remainder is marked unaccounted and requires a reason.</p><table><thead><tr><th>Material</th><th>Issued</th><th>Returned</th><th>Used</th><th>Unaccounted</th><th>Contractor rate</th></tr></thead><tbody>{lines.map(l=>{const returned=l.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;const used=Number(reconcile[l.id]?.used||0);const unaccounted=Number(l.quantity_issued)-returned-used;return <tr key={l.id}><td><strong>{l.description_snapshot}</strong><small>{l.unit_name_snapshot||''}</small></td><td>{l.quantity_issued}</td><td>{returned}</td><td><input className="table-input" type="number" min="0" max={Math.max(Number(l.quantity_issued)-returned,0)} step="0.001" value={reconcile[l.id]?.used??''} onChange={e=>setReconcile({...reconcile,[l.id]:{...reconcile[l.id],used:e.target.value}})}/></td><td><strong>{Math.max(unaccounted,0).toLocaleString('en-IN',{maximumFractionDigits:3})}</strong>{unaccounted>0&&<input className="table-input" placeholder="Reason required" value={reconcile[l.id]?.reason||''} onChange={e=>setReconcile({...reconcile,[l.id]:{...reconcile[l.id],reason:e.target.value}})}/>}</td><td>{inr(l.contractor_unit_rate_paise)}</td></tr>})}{!lines.length&&<tr><td colSpan={6}>No materials were issued against this PO.</td></tr>}</tbody></table><div className="modal-actions"><button className="primary compact" disabled={busy||!reconciled||!lines.length} onClick={()=>void saveReconciliation()}>Save reconciliation & complete work</button></div></section>
+   {selected.status==='completed'&&!settlement&&<section className="table-card"><h3>Prepare contractor settlement</h3><form className="stack" onSubmit={createSettlement}><div className="two-col wide"><label>Settlement number<input value={settlementNumber} onChange={e=>setSettlementNumber(e.target.value)} placeholder="SET/2026-27/001" required/></label><label>Other deductions (₹)<input type="number" min="0" step="0.01" value={otherDeductions} onChange={e=>setOtherDeductions(e.target.value)}/></label></div><label>Adjustments (₹)<input type="number" step="0.01" value={adjustments} onChange={e=>setAdjustments(e.target.value)}/></label><p className="hint">Settlement formula: agreed work amount − material charges − advances − other deductions + adjustments. Excess deductions are recorded as recovery due.</p><button className="primary compact" disabled={busy||!lines.every(l=>true)}>Create settlement draft</button></form></section>}
+   {settlement&&<section className="table-card"><h3>Settlement {settlement.settlement_number}</h3><div className="detail-grid"><div><span>Agreed work amount</span><strong>{inr(settlement.agreed_work_amount_paise)}</strong></div><div><span>Material charges</span><strong>{inr(settlement.material_charges_paise)}</strong></div><div><span>Advances adjusted</span><strong>{inr(settlement.advances_adjusted_paise)}</strong></div><div><span>Other deductions</span><strong>{inr(settlement.other_deductions_paise)}</strong></div><div><span>Adjustments</span><strong>{inr(settlement.adjustments_paise)}</strong></div><div><span>Recovery due</span><strong>{inr(settlement.recovery_due_paise)}</strong></div><div className="pending"><span>Final payable</span><strong>{inr(settlement.final_payable_paise)}</strong></div><div><span>Status</span><strong>{settlement.status}</strong></div></div>
+    {settlement.status==='draft'&&<div className="modal-actions"><button className="primary compact" disabled={busy} onClick={()=>void approve()}>Approve settlement (Admin)</button></div>}
+    {['approved','partially_paid'].includes(settlement.status)&&<form className="stack" onSubmit={recordPayment}><h3>Record settlement payment</h3><div className="two-col wide"><label>Payment amount (₹)<input type="number" min="0.01" step="0.01" value={payment.amount} onChange={e=>setPayment({...payment,amount:e.target.value})} required/></label><label>Payment date<input type="date" value={payment.date} onChange={e=>setPayment({...payment,date:e.target.value})}/></label></div><div className="two-col wide"><label>Method<select value={payment.method} onChange={e=>setPayment({...payment,method:e.target.value})}><option value="bank_transfer">Bank transfer</option><option value="upi">UPI</option><option value="cash">Cash</option><option value="cheque">Cheque</option><option value="card">Card</option><option value="other">Other</option></select></label><label>Reference<input value={payment.reference} onChange={e=>setPayment({...payment,reference:e.target.value})}/></label></div><button className="primary compact" disabled={busy}>Record payment</button></form>}
+   </section>}
+  </>}
+ </main>;
+}
