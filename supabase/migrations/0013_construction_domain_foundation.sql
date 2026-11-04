@@ -309,6 +309,25 @@ create table if not exists public.contractors (
   unique (organization_id, name)
 );
 
+create table if not exists public.contractor_material_rates (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid not null references public.organizations(id) on delete cascade,
+  contractor_id uuid not null,
+  material_id uuid not null,
+  unit_rate_paise bigint not null check (unit_rate_paise >= 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (organization_id, id),
+  unique (organization_id, contractor_id, material_id),
+  foreign key (organization_id, contractor_id)
+    references public.contractors(organization_id, id) on delete cascade,
+  foreign key (organization_id, material_id)
+    references public.materials(organization_id, id) on delete restrict
+);
+
+create index if not exists idx_contractor_material_rates_lookup
+  on public.contractor_material_rates(organization_id, contractor_id, material_id);
+
 create table if not exists public.contractor_work_orders (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
@@ -549,7 +568,7 @@ begin
     'client_companies','contracts','projects','client_bills','client_receipts',
     'client_receipt_allocations','client_deductions','vendors','material_purchases',
     'material_purchase_items','contractors','contractor_work_orders','material_issues',
-    'material_issue_items','material_returns','material_return_items',
+    'material_issue_items','material_returns','material_return_items','contractor_material_rates',
     'contractor_advances','material_reconciliations','contractor_settlements',
     'contractor_settlement_payments'
   ] loop
@@ -567,7 +586,7 @@ declare t text;
 begin
   foreach t in array array[
     'client_companies','contracts','projects','client_bills','vendors',
-    'material_purchases','contractors','contractor_work_orders','contractor_settlements'
+    'material_purchases','contractors','contractor_material_rates','contractor_work_orders','contractor_settlements'
   ] loop
     execute format('drop trigger if exists %I on public.%I', 'trg_' || t || '_updated_at', t);
     execute format(
