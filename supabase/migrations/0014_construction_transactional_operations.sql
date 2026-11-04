@@ -345,11 +345,12 @@ create or replace function public.create_contractor_settlement(
 language plpgsql security definer set search_path = public
 as $$
 declare v_wo public.contractor_work_orders%rowtype; v_id uuid; v_advances bigint:=0;
-  v_material_charges bigint:=0; v_raw bigint; v_line record; v_returned numeric(14,3); v_charge_qty numeric(14,3);
+  v_material_charges bigint:=0; v_raw bigint; v_line record; v_returned numeric(14,3); v_usable_returned numeric(14,3); v_charge_qty numeric(14,3);
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
   if not found or v_wo.status not in ('completed','settlement_pending') then raise exception 'work_order_must_be_completed_before_settlement'; end if;
+  if exists(select 1 from public.contractor_settlements where work_order_id=v_wo.id and status<>'cancelled') then raise exception 'contractor_settlement_already_exists'; end if;
   if nullif(trim(p_settlement_number),'') is null then raise exception 'settlement_number_required'; end if;
   if coalesce(p_other_deductions_paise,0)<0 then raise exception 'other_deductions_cannot_be_negative'; end if;
   if exists(select 1 from public.material_issue_items ii join public.material_issues mi on mi.id=ii.issue_id where mi.work_order_id=v_wo.id and mi.status<>'cancelled' and not exists(select 1 from public.material_reconciliations mr where mr.issue_item_id=ii.id)) then
@@ -358,7 +359,8 @@ begin
   select coalesce(sum(amount_paise),0)::bigint into v_advances from public.contractor_advances where work_order_id=v_wo.id;
   for v_line in
     select ii.id,ii.description_snapshot,ii.unit_name_snapshot,ii.quantity_issued,ii.contractor_unit_rate_paise,
-      coalesce(sum(ri.quantity_returned),0)::numeric(14,3) as returned_qty
+      coalesce(sum(ri.quantity_returned),0)::numeric(14,3) as returned_qty,
+      coalesce(sum(ri.quantity_returned) filter (where ri.condition='usable'),0)::numeric(14,3) as usable_returned_qty
     from public.material_issue_items ii
     join public.material_issues mi on mi.id=ii.issue_id
     left join public.material_return_items ri on ri.issue_item_id=ii.id
@@ -366,7 +368,8 @@ begin
     group by ii.id
   loop
     v_returned:=v_line.returned_qty;
-    v_charge_qty:=greatest(v_line.quantity_issued-v_returned,0);
+    v_usable_returned:=v_line.usable_returned_qty;
+    v_charge_qty:=greatest(v_line.quantity_issued-v_usable_returned,0);
     if v_wo.materials_chargeable then
       v_material_charges:=v_material_charges+round(v_charge_qty*v_line.contractor_unit_rate_paise);
     end if;
@@ -383,7 +386,7 @@ begin
     where mi.work_order_id=v_wo.id and mi.status<>'cancelled'
     group by ii.id
   loop
-    v_charge_qty:=greatest(v_line.quantity_issued-v_line.returned_qty,0);
+    v_charge_qty:=greatest(v_line.quantity_issued-v_line.usable_returned_qty,0);
     insert into public.contractor_settlement_material_lines(organization_id,settlement_id,issue_item_id,material_name_snapshot,unit_name_snapshot,quantity_issued,quantity_returned,chargeable_quantity,contractor_unit_rate_paise,line_charge_paise)
     values(p_organization_id,v_id,v_line.id,v_line.description_snapshot,v_line.unit_name_snapshot,v_line.quantity_issued,v_line.returned_qty,v_charge_qty,v_line.contractor_unit_rate_paise,case when v_wo.materials_chargeable then round(v_charge_qty*v_line.contractor_unit_rate_paise) else 0 end);
   end loop;
