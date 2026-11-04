@@ -291,7 +291,7 @@ declare
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'return_items_required'; end if;
-  if not exists(select 1 from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id) then raise exception 'work_order_not_found'; end if;
+  if not exists(select 1 from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id and status in ('active','work_completed')) then raise exception 'work_order_not_open_for_material_returns'; end if;
 
   insert into public.material_returns(organization_id,return_number,work_order_id,return_date,notes,received_by)
   values (p_organization_id,trim(p_return_number),p_work_order_id,coalesce(p_return_date,current_date),p_notes,auth.uid())
@@ -398,6 +398,7 @@ declare
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if p_quantity_used<0 then raise exception 'used_quantity_cannot_be_negative'; end if;
+  if not exists(select 1 from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id and status='work_completed') then raise exception 'work_order_must_be_completed_before_final_material_reconciliation'; end if;
   select quantity_issued into v_issued
   from public.material_issue_items
   where id=p_issue_item_id and organization_id=p_organization_id
