@@ -31,7 +31,13 @@ const sections = [];
 const upgradeSections = [];
 for (const file of migrationFiles) {
   const source = await fs.readFile(path.join(migrationDir, file), 'utf8');
-  sections.push(`-- Material Management System database setup\n-- Internal migration: ${file}\n-- This file is bundled into the desktop application for customer database initialization.\n\n${source.trim()}`);
+  const section = `-- Material Management System database setup
+-- Internal migration: ${file}
+-- This file is bundled into the desktop application for customer database initialization.
+
+${source.trim()}`;
+  sections.push(section);
+  if (upgradeMigrationFiles.includes(file)) upgradeSections.push(section);
 }
 
 const sql = [
@@ -48,4 +54,17 @@ const sql = [
 
 await fs.mkdir(outputDir, { recursive: true });
 await fs.writeFile(outputFile, `${JSON.stringify(sql, null, 2)}\n`, 'utf8');
+const upgradeSql = [
+  '-- Material Management System — Construction Workflow Upgrade',
+  '-- For existing databases at schema version 12. Run migrations 0013, 0014 and 0015 in order.',
+  '-- Do not rerun migrations 0001–0012 on an existing customer database.',
+  '',
+  ...upgradeSections,
+  '',
+  '-- End of construction workflow upgrade',
+  '',
+].join('\\n\\n');
+
+await fs.writeFile(upgradeOutputFile, `${JSON.stringify(upgradeSql, null, 2)}\\n`, 'utf8');
 console.log(`Generated customer database setup SQL: ${outputFile}`);
+console.log(`Generated construction workflow upgrade SQL: ${upgradeOutputFile}`);
