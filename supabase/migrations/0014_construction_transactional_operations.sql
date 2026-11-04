@@ -298,7 +298,7 @@ create or replace function public.reconcile_contractor_materials(
 language plpgsql security definer set search_path = public
 as $$
 declare v_wo public.contractor_work_orders%rowtype; v_row jsonb; v_line public.material_issue_items%rowtype;
-  v_returned numeric(14,3); v_used numeric(14,3); v_unaccounted numeric(14,3); v_count integer:=0; v_expected integer;
+  v_returned numeric(14,3); v_used numeric(14,3); v_unaccounted numeric(14,3); v_count integer:=0; v_expected integer; v_distinct integer;
 begin
   perform public.require_org_member(p_organization_id);
   select * into v_wo from public.contractor_work_orders where id=p_work_order_id and organization_id=p_organization_id for update;
@@ -320,7 +320,7 @@ begin
     on conflict(issue_item_id) do update set quantity_issued=excluded.quantity_issued,quantity_used=excluded.quantity_used,quantity_returned=excluded.quantity_returned,quantity_unaccounted=excluded.quantity_unaccounted,unaccounted_reason=excluded.unaccounted_reason,verified_by=auth.uid(),verified_at=now();
     v_count:=v_count+1;
   end loop;
-  if v_count<>v_expected then raise exception 'all_issued_material_lines_must_be_reconciled'; end if;
+  select count(distinct value->>'issue_item_id') into v_distinct from jsonb_array_elements(p_rows);\n  if v_count<>v_expected or v_distinct<>v_expected then raise exception 'all_issued_material_lines_must_be_reconciled_once'; end if;
   update public.material_issues set status='reconciled' where work_order_id=v_wo.id and status<>'cancelled';
   update public.contractor_work_orders set status='completed',actual_end_date=coalesce(actual_end_date,current_date) where id=v_wo.id and status in ('active','on_hold');
   insert into public.audit_log(organization_id,user_id,action,entity_type,entity_id,details)
