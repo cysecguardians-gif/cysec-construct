@@ -7,9 +7,11 @@ A reusable Windows desktop application for construction contract finance, vendor
 - Windows desktop application built with React and Tauri.
 - Shared, cloud-hosted business data across multiple office computers.
 - Customer-owned Supabase project, authentication, database, and storage.
-- Inventory management with an auditable stock movement ledger.
-- Customer records and account balances.
-- Invoice creation, discounts, payment recording, and PDF/print output.
+- Tender/client company records, contracts, multiple projects per client, bills/claims, receipts, deductions and retention.
+- Vendor records, purchase entries, material catalogue and auditable stock movement ledger.
+- Contractor/subcontractor records and fixed or percentage-based work orders (POs).
+- Daily material issues with purchase-cost and editable contractor-rate snapshots.
+- Contractor advances, material returns, quantity reconciliation and final settlement.
 - Employee accounts, role-based access, login/session history, and audit trails.
 - Reusable multi-organization data model suitable for future deployments.
 
