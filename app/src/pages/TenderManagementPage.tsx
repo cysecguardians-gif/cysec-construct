@@ -3,7 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 type Company = { id: string; name: string; gstin: string | null; is_active: boolean };
 type Contract = { contract_id: string; client_company_id: string; client_company_name: string; contract_number: string; title: string; original_value_paise: number; revised_value_paise: number; total_billed_paise: number; total_received_paise: number; total_deductions_paise: number; retention_paise: number; pending_receivable_paise: number; unbilled_contract_value_paise: number };
-type Project = { id: string; contract_id: string; name: string; status: string };
+type Project = { id: string; contract_id: string; project_code: string | null; name: string; status: string };
 type Bill = { id: string; contract_id: string; bill_number: string; amount_claimed_paise: number; status: string };
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 const paise = (v: string) => Math.round(Number(v || 0) * 100);
@@ -32,7 +32,7 @@ export default function TenderManagementPage({ supabase, organizationId, onBack 
     const [c, f, p, b] = await Promise.all([
       supabase.from('client_companies').select('id,name,gstin,is_active').eq('organization_id', organizationId).order('name'),
       supabase.from('contract_finance_summary').select('*').eq('organization_id', organizationId).order('contract_number'),
-      supabase.from('projects').select('id,contract_id,name,status').eq('organization_id', organizationId).order('name'),
+      supabase.from('projects').select('id,contract_id,project_code,name,status').eq('organization_id', organizationId).order('name'),
       supabase.from('client_bills').select('id,contract_id,bill_number,amount_claimed_paise,status').eq('organization_id', organizationId).order('bill_date',{ascending:false}),
     ]);
     if (c.error || f.error || p.error || b.error) setError(c.error?.message || f.error?.message || p.error?.message || b.error?.message || 'Could not load contract data.');
