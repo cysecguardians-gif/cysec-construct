@@ -457,10 +457,10 @@ begin
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists %I on public.%I', t || '_member_select', t);
     execute format('create policy %I on public.%I for select to authenticated using (public.is_org_member(organization_id))', t || '_member_select', t);
+    -- Writes are intentionally blocked at the table layer in this foundation migration.
+    -- Subsequent migrations expose narrowly scoped SECURITY DEFINER transaction RPCs.
     execute format('drop policy if exists %I on public.%I', t || '_member_insert', t);
-    execute format('create policy %I on public.%I for insert to authenticated with check (public.is_org_member(organization_id))', t || '_member_insert', t);
     execute format('drop policy if exists %I on public.%I', t || '_member_update', t);
-    execute format('create policy %I on public.%I for update to authenticated using (public.is_org_member(organization_id)) with check (public.is_org_member(organization_id))', t || '_member_update', t);
   end loop;
 end $$;
 
@@ -499,8 +499,8 @@ left join (
 left join (
   select contract_id,
     sum(amount_paise)::bigint as total_deductions_paise,
-    sum(amount_paise) filter (where deduction_type = 'retention')::bigint as retention_paise,
-    sum(amount_paise) filter (where deduction_type <> 'retention')::bigint as non_retention_deductions_paise
+    (sum(amount_paise) filter (where deduction_type = 'retention'))::bigint as retention_paise,
+    (sum(amount_paise) filter (where deduction_type <> 'retention'))::bigint as non_retention_deductions_paise
   from public.client_deductions group by contract_id
 ) d on d.contract_id = c.id;
 
