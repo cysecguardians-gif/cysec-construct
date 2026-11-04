@@ -456,9 +456,6 @@ create table if not exists public.material_reconciliations (
   work_order_id uuid not null,
   issue_item_id uuid not null,
   quantity_used numeric(14,3) not null default 0 check (quantity_used >= 0),
-  quantity_returned numeric(14,3) not null default 0 check (quantity_returned >= 0),
-  quantity_unaccounted numeric(14,3) generated always as
-    (greatest(0, 0)) stored,
   notes text,
   reconciled_by uuid references public.profiles(id) on delete set null,
   reconciled_at timestamptz not null default now(),
@@ -470,8 +467,7 @@ create table if not exists public.material_reconciliations (
     references public.material_issue_items(organization_id, id) on delete restrict
 );
 
--- Unaccounted quantity is exposed in a view because it depends on all return
--- records and must not be a stored/generated constant.
+-- Reconciliation quantity is derived from issue, usage and return ledger rows.
 drop view if exists public.contractor_material_reconciliation_summary;
 create view public.contractor_material_reconciliation_summary
 with (security_invoker = true) as
