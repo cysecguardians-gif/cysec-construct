@@ -239,7 +239,7 @@ begin
   select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id;
   if not found or v_issue.status='cancelled' then raise exception 'material_issue_not_found_or_cancelled'; end if;
   select * into v_wo from public.contractor_work_orders where id=v_issue.work_order_id and organization_id=p_organization_id for update;
-  if not found or v_wo.status not in ('active','on_hold','completed') then raise exception 'work_order_closed_for_material_returns'; end if;
+  if not found or v_wo.status not in ('active','on_hold') then raise exception 'work_order_closed_for_material_returns'; end if;
   select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id for update;
   if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'return_requires_items'; end if;
   insert into public.material_returns(organization_id,issue_id,work_order_id,contractor_id,project_id,return_number,return_date,notes,received_by)
