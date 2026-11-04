@@ -286,6 +286,7 @@ declare
   v_qty numeric;
   v_issued numeric;
   v_already numeric;
+  v_used numeric;
   v_material uuid;
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
@@ -312,7 +313,10 @@ begin
     select coalesce(sum(quantity_returned),0) into v_already
     from public.material_return_items
     where organization_id=p_organization_id and issue_item_id=v_issue_item;
-    if v_already+v_qty>v_issued then raise exception 'return_quantity_exceeds_issued_quantity'; end if;
+    select coalesce(quantity_used,0) into v_used
+    from public.material_reconciliations
+    where organization_id=p_organization_id and issue_item_id=v_issue_item;
+    if v_already+coalesce(v_used,0)+v_qty>v_issued then raise exception 'return_quantity_plus_recorded_usage_exceeds_issued_quantity'; end if;
 
     insert into public.material_return_items(organization_id,return_id,issue_item_id,material_id,quantity_returned)
     values (p_organization_id,v_return,v_issue_item,v_material,v_qty);
