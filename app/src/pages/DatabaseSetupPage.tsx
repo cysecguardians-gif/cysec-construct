@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import setupSql from '../generated/customerDatabaseSetup.json';
 import constructionUpgradeSql from '../generated/constructionWorkflowUpgrade.json';
+import contractorSettlementUpgradeSql from '../generated/contractorSettlementUpgrade.json';
 
 type Props = {
   supabase: SupabaseClient;
@@ -72,6 +73,13 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       return;
     }
 
+    if (version < 16) {
+      setMessage(`${responseSummary}. Contractor settlement schema update required.`);
+      setError('This database is at schema v15. Copy the Contractor Settlement Upgrade SQL and run migration 0016 only in this business Supabase project. Do not rerun migrations 0013, 0014 or 0015, or the original setup SQL.');
+      setBusy(false);
+      return;
+    }
+
     setMessage(`${responseSummary}. Database schema v${version} is ready.`);
     setBusy(false);
     onReady();
@@ -86,6 +94,18 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       window.setTimeout(() => setCopied(false), 2500);
     } catch (e) {
       setError(e instanceof Error ? `Could not copy the upgrade SQL: ${e.message}` : 'Could not copy the upgrade SQL.');
+    }
+  }
+
+  async function copySettlementUpgradeSql() {
+    setError('');
+    try {
+      await navigator.clipboard.writeText(contractorSettlementUpgradeSql);
+      setCopied(true);
+      setMessage('Contractor Settlement Upgrade SQL copied. Run migration 0016 only in Supabase.');
+      window.setTimeout(() => setCopied(false), 2500);
+    } catch (e) {
+      setError(e instanceof Error ? `Could not copy the settlement upgrade SQL: ${e.message}` : 'Could not copy the settlement upgrade SQL.');
     }
   }
 
@@ -125,14 +145,20 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
         <div className="stack" style={{ gap: 12 }}>
           <div className="setup-card" style={{ display: 'block', marginBottom: 0 }}>
-            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? 'Update the existing database' : 'Install the database schema'}</h3>
+            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 16 ? 'Update the existing database' : 'Install the database schema'}</h3>
             <p>
               {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15
-                ? 'Your existing business database is already installed. Apply only the new construction workflow migrations; do not rerun the original setup script.'
-                : 'The complete production database setup SQL is bundled inside this desktop application. You do not need access to our GitHub repository.'}
+                ? 'Your existing business database is already installed. Apply the construction workflow migrations in order; do not rerun the original setup script.'
+                : schemaVersion === 15
+                  ? 'Your database is at schema version 15. Apply only migration 0016 to enable replacement settlements after cancellation. Do not rerun earlier migrations.'
+                  : 'The complete production database setup SQL is bundled inside this desktop application. You do not need access to our GitHub repository.'}
             </p>
             <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
-              <li>Click <strong>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? 'Copy construction workflow upgrade SQL' : 'Copy database setup SQL'}</strong>.</li>
+              <li>Click <strong>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15
+                  ? 'Copy construction workflow upgrade SQL'
+                  : schemaVersion === 15
+                    ? 'Copy contractor settlement upgrade SQL'
+                    : 'Copy database setup SQL'}</strong>.</li>
               <li>Open the Supabase SQL Editor for this business.</li>
               <li>Paste the SQL and click <strong>Run</strong>.</li>
               <li>Return here and click <strong>Verify database setup</strong>.</li>
@@ -148,6 +174,11 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
             {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 && (
               <button className="secondary" type="button" onClick={() => void copyUpgradeSql()}>
                 {copied ? 'SQL copied' : 'Copy construction workflow upgrade SQL'}
+              </button>
+            )}
+            {schemaVersion === 15 && (
+              <button className="secondary" type="button" onClick={() => void copySettlementUpgradeSql()}>
+                {copied ? 'SQL copied' : 'Copy contractor settlement upgrade SQL'}
               </button>
             )}
             <a
