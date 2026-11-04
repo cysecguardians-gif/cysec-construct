@@ -72,7 +72,7 @@ Initial settlement calculation:
 
 `final_payable = agreed_work_amount - chargeable_materials - advances_adjusted - other_deductions + adjustments`
 
-The settlement must be protected against negative payable amounts; any excess deductions are surfaced as a contractor balance/recovery due rather than silently clamped or lost. The settlement stores immutable snapshots of the PO amount, percentage basis, material issue lines, contractor rates, returned quantities, advances and deductions.
+The settlement must be protected against negative payable amounts. If deductions exceed the agreed work amount, payable is zero and the excess is stored separately as a contractor recovery due; it must never be silently clamped or lost. The settlement stores immutable snapshots of the PO amount, percentage basis, material issue lines, contractor rates, returned quantities, advances and deductions.
 
 Settlement payments are recorded separately and can be partial. Historical settlement rows are not deleted; corrections use cancellation/reversal records.
 
