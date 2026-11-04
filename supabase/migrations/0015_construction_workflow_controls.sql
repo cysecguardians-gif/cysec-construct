@@ -174,6 +174,15 @@ begin
     raise exception 'receipt_allocations_must_equal_receipt_amount';
   end if;
 
+  update public.client_bills cb
+  set status=case
+    when (select coalesce(sum(a.amount_paise),0) from public.client_receipt_allocations a
+      where a.organization_id=cb.organization_id and a.bill_id=cb.id) >= cb.amount_paise then 'paid'
+    else 'partially_paid'
+  end
+  where cb.organization_id=p_organization_id
+    and cb.id in (select bill_id from public.client_receipt_allocations where receipt_id=v_id);
+
   insert into public.audit_log(organization_id,user_id,action,entity_type,entity_id,details)
   values (p_organization_id,auth.uid(),'client_receipt_recorded','client_receipt',v_id,
     jsonb_build_object('contract_id',p_contract_id,'amount_paise',p_amount_paise,'allocated_paise',v_sum,'unallocated_paise',p_amount_paise-v_sum));
