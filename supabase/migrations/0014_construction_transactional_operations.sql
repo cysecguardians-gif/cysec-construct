@@ -231,13 +231,16 @@ create or replace function public.return_contractor_materials(
 ) returns uuid
 language plpgsql security definer set search_path = public
 as $$
-declare v_return uuid; v_issue public.material_issues%rowtype; v_item jsonb;
+declare v_return uuid; v_issue public.material_issues%rowtype; v_wo public.contractor_work_orders%rowtype; v_item jsonb;
   v_line public.material_issue_items%rowtype; v_qty numeric(14,3);
   v_already numeric(14,3); v_condition text; v_count integer:=0;
 begin
   perform public.require_org_member(p_organization_id);
-  select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id for update;
+  select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id;
   if not found or v_issue.status='cancelled' then raise exception 'material_issue_not_found_or_cancelled'; end if;
+  select * into v_wo from public.contractor_work_orders where id=v_issue.work_order_id and organization_id=p_organization_id for update;
+  if not found or v_wo.status not in ('active','on_hold','completed') then raise exception 'work_order_closed_for_material_returns'; end if;
+  select * into v_issue from public.material_issues where id=p_issue_id and organization_id=p_organization_id for update;
   if p_items is null or jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 then raise exception 'return_requires_items'; end if;
   insert into public.material_returns(organization_id,issue_id,work_order_id,contractor_id,project_id,return_number,return_date,notes,received_by)
   values(p_organization_id,v_issue.id,v_issue.work_order_id,v_issue.contractor_id,v_issue.project_id,nullif(trim(p_return_number),''),p_return_date,p_notes,auth.uid())
