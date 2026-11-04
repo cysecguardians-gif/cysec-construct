@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import setupSql from '../generated/customerDatabaseSetup.json';
+import constructionUpgradeSql from '../generated/constructionWorkflowUpgrade.json';
 
 type Props = {
   supabase: SupabaseClient;
@@ -21,6 +22,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState('Checking database schema…');
+  const [schemaVersion, setSchemaVersion] = useState<number | null>(null);
 
   async function verify() {
     setBusy(true);
@@ -49,6 +51,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
     const appStatus = data as AppStatusResponse | null;
     const version = Number(appStatus?.schema_version ?? 0);
+    setSchemaVersion(version);
     const responseSummary = appStatus
       ? `RPC succeeded • authenticated=${String(appStatus.authenticated ?? 'unknown')} • schema_version=${String(appStatus.schema_version ?? 'null')}`
       : 'RPC succeeded, but returned no status object.';
@@ -60,9 +63,30 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       return;
     }
 
+    if (version < 15) {
+      setMessage(`${responseSummary}. Construction workflow schema update required.`);
+      setError(version >= 12
+        ? 'This database needs migrations 0013, 0014 and 0015. Copy the Construction Workflow Upgrade SQL below and run it in Supabase. Do not rerun the original database setup SQL.'
+        : `This database is at schema v${version}. Apply the missing numbered migrations through v12 first, then run the Construction Workflow Upgrade SQL. Do not rerun migrations 0001–0012.`);
+      setBusy(false);
+      return;
+    }
+
     setMessage(`${responseSummary}. Database schema v${version} is ready.`);
     setBusy(false);
     onReady();
+  }
+
+  async function copyUpgradeSql() {
+    setError('');
+    try {
+      await navigator.clipboard.writeText(constructionUpgradeSql);
+      setCopied(true);
+      setMessage('Construction Workflow Upgrade SQL copied. Run migrations 0013, 0014 and 0015 in Supabase.');
+      window.setTimeout(() => setCopied(false), 2500);
+    } catch (e) {
+      setError(e instanceof Error ? `Could not copy the upgrade SQL: ${e.message}` : 'Could not copy the upgrade SQL.');
+    }
   }
 
   async function copySetupSql() {
@@ -101,13 +125,14 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
         <div className="stack" style={{ gap: 12 }}>
           <div className="setup-card" style={{ display: 'block', marginBottom: 0 }}>
-            <h3>Install the database schema</h3>
+            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? 'Update the existing database' : 'Install the database schema'}</h3>
             <p>
-              The complete production database setup SQL is bundled inside this desktop application. You do not need
-              access to our GitHub repository.
+              {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15
+                ? 'Your existing business database is already installed. Apply only the new construction workflow migrations; do not rerun the original setup script.'
+                : 'The complete production database setup SQL is bundled inside this desktop application. You do not need access to our GitHub repository.'}
             </p>
             <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
-              <li>Click <strong>Copy database setup SQL</strong>.</li>
+              <li>Click <strong>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? 'Copy construction workflow upgrade SQL' : 'Copy database setup SQL'}</strong>.</li>
               <li>Open the Supabase SQL Editor for this business.</li>
               <li>Paste the SQL and click <strong>Run</strong>.</li>
               <li>Return here and click <strong>Verify database setup</strong>.</li>
@@ -115,8 +140,8 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="secondary" type="button" onClick={() => void copySetupSql()}>
-              {copied ? 'SQL copied' : 'Copy database setup SQL'}
+            <button className="secondary" type="button" onClick={() => void (schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? copyUpgradeSql() : copySetupSql())}>
+              {copied ? 'SQL copied' : schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 ? 'Copy construction workflow upgrade SQL' : 'Copy database setup SQL'}
             </button>
             <a
               href="https://supabase.com/dashboard"
