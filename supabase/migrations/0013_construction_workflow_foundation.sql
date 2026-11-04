@@ -5,6 +5,11 @@
 
 begin;
 
+-- Current reference purchase cost used to prefill contractor issue pricing.
+-- Historical purchase and issue lines retain their own immutable cost snapshots.
+alter table public.materials
+  add column if not exists purchase_price_paise bigint not null default 0 check (purchase_price_paise >= 0);
+
 -- ============================================================
 -- 1. Client companies, contracts and projects
 -- ============================================================
@@ -380,6 +385,7 @@ create table if not exists public.contractor_settlements (
   other_deductions_paise bigint not null default 0 check (other_deductions_paise >= 0),
   adjustments_paise bigint not null default 0,
   final_payable_paise bigint not null check (final_payable_paise >= 0),
+  recovery_due_paise bigint not null default 0 check (recovery_due_paise >= 0),
   status text not null default 'draft' check (status in ('draft','approved','partially_paid','paid','cancelled')),
   notes text,
   prepared_by uuid references public.profiles(id) on delete set null,
