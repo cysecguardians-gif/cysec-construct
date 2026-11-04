@@ -1,6 +1,6 @@
 # Material Management System
 
-A reusable desktop application for inventory, customer, invoicing, and payment management. The product is designed to support multiple independent businesses while allowing each customer to own and manage their own Supabase project and business data.
+A reusable Windows desktop application for construction contract finance, vendor procurement, material inventory, contractor work orders, daily material issues, advances, reconciliation and contractor settlement. Each business owns and manages its own Supabase project and business data.
 
 ## Product goals
 
@@ -13,7 +13,7 @@ A reusable desktop application for inventory, customer, invoicing, and payment m
 - Employee accounts, role-based access, login/session history, and audit trails.
 - Reusable multi-organization data model suitable for future deployments.
 
-## Architecture
+## Primary application sections\n\n1. Tender / Contract Management\n2. Material Management\n3. Contractor Management\n4. Contractor Closure & Settlement\n\nSee [construction workflow design](docs/construction-workflows.md) for the business rules and data model.\n\n## Architecture
 
 ```text
 GitHub repository (product source + SQL migrations + documentation)
