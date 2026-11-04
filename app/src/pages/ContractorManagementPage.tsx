@@ -17,7 +17,8 @@ export default function ContractorManagementPage({supabase,organizationId,onBack
  const [modal,setModal]=useState<'contractor'|'po'|'issue'|'advance'|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState('');
  const [contractorForm,setContractorForm]=useState({name:'',type:'subcontractor',phone:'',gstin:'',pan:''});
  const [poForm,setPoForm]=useState({project:'',contractor:'',number:'',basis:'fixed',fixed:'',percentage:'',date:new Date().toISOString().slice(0,10)});
- const [issueForm,setIssueForm]=useState({workOrder:'',date:new Date().toISOString().slice(0,10),number:''});\n const [issueLines,setIssueLines]=useState([{material:'',quantity:'',rate:''}]);
+ const [issueForm,setIssueForm]=useState({workOrder:'',date:new Date().toISOString().slice(0,10),number:''});
+ const [issueLines,setIssueLines]=useState([{material:'',quantity:'',rate:''}]);
  const [advanceForm,setAdvanceForm]=useState({workOrder:'',date:new Date().toISOString().slice(0,10),amount:'',method:'cash',reference:''});
  async function load(){
   const [c,p,w,m,i,a]=await Promise.all([
