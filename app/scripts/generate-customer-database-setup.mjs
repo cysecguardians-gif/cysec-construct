@@ -8,6 +8,7 @@ const outputDir = path.join(appDir, 'src', 'generated');
 const outputFile = path.join(outputDir, 'customerDatabaseSetup.json');
 const upgradeOutputFile = path.join(outputDir, 'constructionWorkflowUpgrade.json');
 const settlementUpgradeOutputFile = path.join(outputDir, 'contractorSettlementUpgrade.json');
+const constructionImportUpgradeOutputFile = path.join(outputDir, 'constructionDataImportUpgrade.json');
 
 const migrationFiles = [
   '0001_initial_schema.sql',
@@ -26,6 +27,7 @@ const migrationFiles = [
   '0014_construction_transactional_operations.sql',
   '0015_client_contract_finance.sql',
   '0016_allow_replacement_cancelled_settlements.sql',
+  '0017_construction_data_imports.sql',
 ];
 
 const upgradeMigrationFiles = migrationFiles.filter(file => /^001[3-5]_/.test(file));
@@ -87,3 +89,19 @@ await fs.writeFile(settlementUpgradeOutputFile, `${JSON.stringify(settlementUpgr
 console.log(`Generated customer database setup SQL: ${outputFile}`);
 console.log(`Generated construction workflow upgrade SQL: ${upgradeOutputFile}`);
 console.log(`Generated contractor settlement upgrade SQL: ${settlementUpgradeOutputFile}`);
+
+const constructionImportMigration = '0017_construction_data_imports.sql';
+const constructionImportSource = await fs.readFile(path.join(migrationDir, constructionImportMigration), 'utf8');
+const constructionImportUpgradeSql = [
+  '-- BuildSphere — Construction Data Import Upgrade',
+  '-- For existing databases at schema version 16. Run migration 0017 only.',
+  '-- Do not rerun earlier migrations or the original database setup SQL.',
+  '',
+  \`-- Internal migration: \${constructionImportMigration}\`,
+  constructionImportSource.trim(),
+  '',
+  '-- End of construction data import upgrade',
+  '',
+].join('\n\n');
+await fs.writeFile(constructionImportUpgradeOutputFile, \`\${JSON.stringify(constructionImportUpgradeSql, null, 2)}\n\`, 'utf8');
+console.log(\`Generated construction data import upgrade SQL: \${constructionImportUpgradeOutputFile}\`);
