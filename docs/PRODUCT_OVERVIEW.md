@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Material Management System is a reusable business application for companies that buy, store, sell, and distribute physical materials or goods. It is not limited to construction materials.
+CySec Construct is a construction business management application for companies that buy, store, sell, and distribute physical materials or goods. It is not limited to construction materials.
 
 ## Initial modules
 
