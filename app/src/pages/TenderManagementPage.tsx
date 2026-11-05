@@ -9,8 +9,8 @@ const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR
 const paise = (v: string) => Math.round(Number(v || 0) * 100);
 const rupees = (v: number) => money.format(Number(v || 0) / 100);
 
-export default function TenderManagementPage({ supabase, organizationId, onBack }: { supabase: SupabaseClient; organizationId: string; onBack: () => void }) {
-  const [tab, setTab] = useState<'contracts' | 'finance' | 'projects'>('contracts');
+export default function TenderManagementPage({ supabase, organizationId, section, onBack }: { supabase: SupabaseClient; organizationId: string; section: 'contracts' | 'finance' | 'projects'; onBack: () => void }) {
+  const [tab] = useState<'contracts' | 'finance' | 'projects'>(section);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -58,18 +58,13 @@ export default function TenderManagementPage({ supabase, organizationId, onBack 
   async function saveDeduction(e: React.FormEvent) { e.preventDefault(); if (!selectedContract) return; await runRpc('record_client_deduction', { p_organization_id: organizationId, p_contract_id: selectedContract, p_deduction_type: deductionForm.type, p_amount_paise: paise(deductionForm.amount), p_bill_id: deductionForm.bill || null, p_deduction_date: deductionForm.date, p_reference_number: deductionForm.reference || null }); }
 
   return <main className="main-content">
-    <header className="topbar"><div><button className="back-link" onClick={onBack}>← Overview</button><p className="eyebrow">Section 01</p><h1>Tender & Contract Management</h1></div><button className="primary compact" onClick={() => setModal('company')}>Add client company</button></header>
+    <header className="topbar"><div><button className="back-link" onClick={onBack}>← Overview</button><p className="eyebrow">Project Management</p><h1>{tab === 'projects' ? 'Projects' : tab === 'finance' ? 'Contract finance' : 'Client companies & contracts'}</h1></div>{tab === 'contracts' && <button className="primary compact" onClick={() => setModal('company')}>Add client company</button>}</header>
     <section className="metric-grid">
       <div className="metric"><span>Contracts</span><strong>{contracts.length}</strong></div>
       <div className="metric"><span>Total contract value</span><strong>{rupees(contracts.reduce((s,c)=>s+Number(c.revised_value_paise),0))}</strong></div>
       <div className="metric"><span>Received</span><strong>{rupees(contracts.reduce((s,c)=>s+Number(c.total_received_paise),0))}</strong></div>
       <div className="metric"><span>Pending receivables</span><strong>{rupees(contracts.reduce((s,c)=>s+Number(c.pending_receivable_paise),0))}</strong></div>
     </section>
-    <div className="tab-row">
-      <button className={tab==='contracts'?'tab-active':''} onClick={()=>setTab('contracts')}>Contracts</button>
-      <button className={tab==='finance'?'tab-active':''} onClick={()=>setTab('finance')}>Finance overview</button>
-      <button className={tab==='projects'?'tab-active':''} onClick={()=>setTab('projects')}>Projects</button>
-    </div>
     {error && <div className="alert error page-alert">{error}</div>}
     {tab !== 'projects' && <section className="page-toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search client, contract number or project…"/><span>{filtered.length} contracts</span><button className="primary compact" onClick={()=>setModal('contract')} disabled={!companies.length}>Add contract</button></section>}
     {tab==='contracts' && <section className="table-card">{busy?<div className="table-empty">Loading contracts…</div>:filtered.length===0?<div className="table-empty"><strong>No contracts yet</strong><span>Add a client company, then create its first contract.</span></div>:<table><thead><tr><th>Contract</th><th>Client company</th><th>Contract value</th><th>Received</th><th>Pending</th><th></th></tr></thead><tbody>{filtered.map(c=><tr key={c.contract_id}><td><strong>{c.contract_number}</strong><small>{c.title}</small></td><td>{c.client_company_name}</td><td>{rupees(c.revised_value_paise)}</td><td>{rupees(c.total_received_paise)}</td><td><strong>{rupees(c.pending_receivable_paise)}</strong></td><td><div className="row-actions"><button onClick={()=>{setSelectedContract(c.contract_id);setModal('bill')}}>Add bill</button><button onClick={()=>{setSelectedContract(c.contract_id);setModal('receipt')}}>Receipt</button><button onClick={()=>{setSelectedContract(c.contract_id);setModal('deduction')}}>Deduction</button></div></td></tr>)}</tbody></table>}</section>}
