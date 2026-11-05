@@ -10,7 +10,7 @@ const paise = (v: string) => Math.round(Number(v || 0) * 100);
 const rupees = (v: number) => money.format(Number(v || 0) / 100);
 
 export default function TenderManagementPage({ supabase, organizationId, section, onBack }: { supabase: SupabaseClient; organizationId: string; section: 'contracts' | 'finance' | 'projects'; onBack: () => void }) {
-  const [tab] = useState<'contracts' | 'finance' | 'projects'>(section);
+  const tab = section;
   const [companies, setCompanies] = useState<Company[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -35,11 +35,15 @@ export default function TenderManagementPage({ supabase, organizationId, section
       supabase.from('projects').select('id,contract_id,project_code,name,status').eq('organization_id', organizationId).order('name'),
       supabase.from('client_bills').select('id,contract_id,bill_number,amount_claimed_paise,status').eq('organization_id', organizationId).order('bill_date',{ascending:false}),
     ]);
-    if (c.error || f.error || p.error || b.error) setError(c.error?.message || f.error?.message || p.error?.message || b.error?.message || 'Could not load contract data.');
-    else { setCompanies((c.data ?? []) as Company[]); setContracts((f.data ?? []) as Contract[]); setProjects((p.data ?? []) as Project[]); setBills((b.data ?? []) as Bill[]); }
+    if (!c.error) setCompanies((c.data ?? []) as Company[]);
+    if (!f.error) setContracts((f.data ?? []) as Contract[]);
+    if (!p.error) setProjects((p.data ?? []) as Project[]);
+    if (!b.error) setBills((b.data ?? []) as Bill[]);
+    const relevantError = f.error || (tab === 'contracts' && (c.error || b.error)) || (tab === 'projects' && p.error);
+    if (relevantError) setError(relevantError.message);
     setBusy(false);
   }
-  useEffect(() => { void load(); }, [organizationId]);
+  useEffect(() => { void load(); }, [organizationId, section]);
   const filtered = useMemo(() => { const q = search.trim().toLowerCase(); return contracts.filter(c => !q || `${c.client_company_name} ${c.contract_number} ${c.title}`.toLowerCase().includes(q)); }, [contracts, search]);
   const selected = contracts.find(c => c.contract_id === selectedContract);
 

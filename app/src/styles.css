@@ -16,10 +16,10 @@
 @media(max-width:1200px){.purchase-line{grid-template-columns:1fr 1fr}.toolbar-actions{flex-wrap:wrap}}
 
 
-/* Keep navigation and workspace scrolling independent. */
+/* Keep navigation and workspace scrolling independent. All sidebar actions scroll with navigation. */
 .app-shell{height:100vh;min-height:0;overflow:hidden}
 .sidebar{height:100vh;min-height:0;overflow:hidden}
-.sidebar nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
-.sidebar-footer{flex:0 0 auto}
+.sidebar nav{display:flex;flex:1;min-height:0;flex-direction:column;gap:12px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
+.sidebar-footer{display:grid;gap:5px;margin-top:auto;flex:0 0 auto;padding-top:8px;border-top:1px solid #293548}
 .main-content{height:100vh;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain}
 @media print{.app-shell,.sidebar,.main-content{height:auto;min-height:0;overflow:visible}}
