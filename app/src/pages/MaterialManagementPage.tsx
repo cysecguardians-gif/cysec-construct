@@ -9,8 +9,8 @@ type Purchase = { id: string; purchase_number: string | null; vendor_invoice_num
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 const paise = (v: string) => Math.round(Number(v || 0) * 100);
 
-export default function MaterialManagementPage({ supabase, organizationId, onBack }: { supabase: SupabaseClient; organizationId: string; onBack: () => void }) {
-  const [tab, setTab] = useState<'catalogue'|'purchases'|'ledger'>('catalogue');
+export default function MaterialManagementPage({ supabase, organizationId, section, onBack }: { supabase: SupabaseClient; organizationId: string; section: 'catalogue'|'purchases'|'ledger'; onBack: () => void }) {
+  const tab = section;
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
