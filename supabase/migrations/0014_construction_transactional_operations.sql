@@ -20,7 +20,7 @@ declare v_id uuid;
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if nullif(trim(p_name), '') is null then raise exception 'client_company_name_required'; end if;
-  insert into public.client_companies(organization_id,name,gstin,pan,contact_person,phone,email,address,city,state,state_code,postal_code)
+  insert into public.client_companies(organization_id,name,gstin,pan,contact_person,phone,email,billing_address,city,state,state_code,postal_code)
   values(p_organization_id,trim(p_name),nullif(trim(p_gstin),''),nullif(trim(p_pan),''),nullif(trim(p_contact_person),''),nullif(trim(p_phone),''),nullif(trim(p_email),''),nullif(trim(p_address),''),nullif(trim(p_city),''),nullif(trim(p_state),''),nullif(trim(p_state_code),''),nullif(trim(p_postal_code),''))
   returning id into v_id;
   return v_id;
@@ -380,7 +380,8 @@ begin
   returning id into v_id;
   for v_line in
     select ii.id,ii.description_snapshot,ii.unit_name_snapshot,ii.quantity_issued,ii.contractor_unit_rate_paise,
-      coalesce(sum(ri.quantity_returned),0)::numeric(14,3) as returned_qty
+      coalesce(sum(ri.quantity_returned),0)::numeric(14,3) as returned_qty,
+      coalesce(sum(ri.quantity_returned) filter (where ri.condition='usable'),0)::numeric(14,3) as usable_returned_qty
     from public.material_issue_items ii join public.material_issues mi on mi.id=ii.issue_id
     left join public.material_return_items ri on ri.issue_item_id=ii.id
     where mi.work_order_id=v_wo.id and mi.status<>'cancelled'
