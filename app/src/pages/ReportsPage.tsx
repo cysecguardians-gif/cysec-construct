@@ -3,8 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import './reports.css';
 
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-const today = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
+const localDate = (d: Date) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const today = () => localDate(new Date());
+const monthStart = () => { const d = new Date(); d.setDate(1); return localDate(d); };
 const fyStart = () => { const d = new Date(); const y = d.getFullYear(); return (d.getMonth() + 1 >= 4 ? y : y - 1) + '-04-01'; };
 const rupees = (v: unknown) => money.format(Number(v || 0) / 100);
 const quantity = (v: unknown) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 });
