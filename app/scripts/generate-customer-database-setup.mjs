@@ -97,11 +97,11 @@ const constructionImportUpgradeSql = [
   '-- For existing databases at schema version 16. Run migration 0017 only.',
   '-- Do not rerun earlier migrations or the original database setup SQL.',
   '',
-  \`-- Internal migration: \${constructionImportMigration}\`,
+  '-- Internal migration: ' + constructionImportMigration,
   constructionImportSource.trim(),
   '',
   '-- End of construction data import upgrade',
   '',
 ].join('\n\n');
-await fs.writeFile(constructionImportUpgradeOutputFile, \`\${JSON.stringify(constructionImportUpgradeSql, null, 2)}\n\`, 'utf8');
-console.log(\`Generated construction data import upgrade SQL: \${constructionImportUpgradeOutputFile}\`);
+await fs.writeFile(constructionImportUpgradeOutputFile, JSON.stringify(constructionImportUpgradeSql, null, 2) + '\n', 'utf8');
+console.log('Generated construction data import upgrade SQL: ' + constructionImportUpgradeOutputFile);

@@ -168,3 +168,10 @@ Customers do not need to access these individual files. The Windows application 
 Do not edit an already-applied migration for a customer. Create a new numbered migration for later schema changes and ensure the build-time customer setup generator includes it.
 
 The product never puts a service-role key or database password into the desktop installer.
+
+
+## Construction data import (schema v17)
+
+Migration `0017_construction_data_imports.sql` adds the Admin-only, all-or-nothing `import_construction_records(...)` RPC. It imports client companies, contracts, projects, vendors, contractors, contractor work orders, contractor advances, client bills, client receipts, and client deductions. Imports resolve parent records by business identifiers (such as contract number, project code/name, PO number, and bill number) within the same organization. Duplicate business keys and missing parent records stop the transaction; existing records are not overwritten. Amounts supplied by the desktop import screen are in INR and are converted to integer paise by the database function.
+
+Contractor settlements are deliberately not imported as raw rows because their calculation snapshots depend on verified material issues/returns, reconciliations, advances, and deductions. Create settlements through the normal settlement workflow after importing and validating the underlying records. Existing material purchases, issues, and returns also remain operational transactions and are not currently part of the construction CSV import types.

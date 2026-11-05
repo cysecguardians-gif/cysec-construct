@@ -172,7 +172,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
         <div className="stack" style={{ gap: 12 }}>
           <div className="setup-card" style={{ display: 'block', marginBottom: 0 }}>
-            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 16 ? 'Update the existing database' : 'Install the database schema'}</h3>
+            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 17 ? 'Update the existing database' : 'Install the database schema'}</h3>
             <p>
               {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15
                 ? 'Your existing business database is already installed. Apply the construction workflow migrations in order; do not rerun the original setup script.'
