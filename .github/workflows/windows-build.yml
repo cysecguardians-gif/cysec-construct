@@ -2,8 +2,10 @@ name: Windows Desktop Build
 
 on:
   workflow_dispatch:
-  push:
+  pull_request:
     branches: [main]
+  push:
+    branches: [main, feature/construction-contract-workflows]
 
 jobs:
   build-windows:
