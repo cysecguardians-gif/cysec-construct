@@ -1,6 +1,6 @@
-# Material Management System
+# CySec Construct
 
-A reusable desktop application for tender/contract finance, material procurement and inventory, contractor work orders, and contractor settlement management. The product is designed to support multiple independent businesses while allowing each customer to own and manage their own Supabase project and business data.
+CySec Construct is a Windows desktop application for construction contract finance, vendor procurement, material inventory, contractor work orders, daily material issues, advances, reconciliation and contractor settlement. It is published by CySec Guardians. Each business owns and manages its own Supabase project and business data. The product is designed to support multiple independent businesses while allowing each customer to own and manage their own Supabase project and business data.
 
 ## Product goals
 
