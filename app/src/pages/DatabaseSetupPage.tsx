@@ -3,7 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import setupSql from '../generated/customerDatabaseSetup.json';
 import constructionUpgradeSql from '../generated/constructionWorkflowUpgrade.json';
 import contractorSettlementUpgradeSql from '../generated/contractorSettlementUpgrade.json';
-import constructionImportUpgradeSql from '../generated/constructionDataImportUpgrade.json';
 
 type Props = {
   supabase: SupabaseClient;
@@ -88,13 +87,6 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       return;
     }
 
-    if (version < 17) {
-      setMessage(`${responseSummary}. Construction data import update required.`);
-      setError('This database is at schema v16. Copy the Construction Data Import Upgrade SQL and run migration 0017 only in this business Supabase project. Do not rerun earlier migrations or the original setup SQL.');
-      setBusy(false);
-      return;
-    }
-
     setMessage(`${responseSummary}. Database schema v${version} is ready.`);
     setBusy(false);
     onReady();
@@ -121,18 +113,6 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       window.setTimeout(() => setCopied(false), 2500);
     } catch (e) {
       setError(e instanceof Error ? `Could not copy the settlement upgrade SQL: ${e.message}` : 'Could not copy the settlement upgrade SQL.');
-    }
-  }
-
-  async function copyConstructionImportUpgradeSql() {
-    setError('');
-    try {
-      await navigator.clipboard.writeText(constructionImportUpgradeSql);
-      setCopied(true);
-      setMessage('Construction Data Import Upgrade SQL copied. Run migration 0017 only.');
-      window.setTimeout(() => setCopied(false), 2500);
-    } catch (e) {
-      setError(e instanceof Error ? `Could not copy the construction import upgrade SQL: ${e.message}` : 'Could not copy the construction import upgrade SQL.');
     }
   }
 
@@ -172,14 +152,12 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
         <div className="stack" style={{ gap: 12 }}>
           <div className="setup-card" style={{ display: 'block', marginBottom: 0 }}>
-            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 17 ? 'Update the existing database' : 'Install the database schema'}</h3>
+            <h3>{schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 16 ? 'Update the existing database' : 'Install the database schema'}</h3>
             <p>
               {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15
                 ? 'Your existing business database is already installed. Apply the construction workflow migrations in order; do not rerun the original setup script.'
                 : schemaVersion === 15
                   ? 'Your database is at schema version 15. Apply only migration 0016 to enable replacement settlements after cancellation. Do not rerun earlier migrations.'
-                  : schemaVersion === 16
-                    ? 'Your database is at schema version 16. Apply only migration 0017 to enable construction data imports. Do not rerun earlier migrations.'
                   : 'The complete production database setup SQL is bundled inside this desktop application. You do not need access to our GitHub repository.'}
             </p>
             <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
@@ -187,8 +165,6 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
                   ? 'Copy construction workflow upgrade SQL'
                   : schemaVersion === 15
                     ? 'Copy contractor settlement upgrade SQL'
-                    : schemaVersion === 16
-                      ? 'Copy construction data import upgrade SQL'
                     : 'Copy database setup SQL'}</strong>.</li>
               <li>Open the Supabase SQL Editor for this business.</li>
               <li>Paste the SQL and click <strong>Run</strong>.</li>
@@ -205,11 +181,6 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
             {schemaVersion !== null && schemaVersion >= 12 && schemaVersion < 15 && (
               <button className="secondary" type="button" onClick={() => void copyUpgradeSql()}>
                 {copied ? 'SQL copied' : 'Copy construction workflow upgrade SQL'}
-              </button>
-            )}
-            {schemaVersion === 16 && (
-              <button className="secondary" type="button" onClick={() => void copyConstructionImportUpgradeSql()}>
-                {copied ? 'SQL copied' : 'Copy construction data import upgrade SQL'}
               </button>
             )}
             {schemaVersion === 15 && (
