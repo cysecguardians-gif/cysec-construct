@@ -86,15 +86,15 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
     <div className="auth-page">
       <div className="auth-card" style={{ width: 'min(700px, 100%)' }}>
         <div className="brand auth-brand">
-          <span className="brand-mark">M</span>
-          <div><strong>Material Management</strong><small>Business Edition</small></div>
+          <span className="brand-mark">CC</span>
+          <div><strong>CySec Construct</strong><small>Business Edition</small></div>
         </div>
 
         <div className="auth-copy">
           <p className="eyebrow">Database setup</p>
           <h1>Prepare your business database</h1>
           <p>
-            Your Supabase project is connected, but the Material Management System database schema has not been installed yet.
+            Your Supabase project is connected, but the CySec Construct database schema has not been installed yet.
             This is a one-time setup for this business.
           </p>
         </div>
