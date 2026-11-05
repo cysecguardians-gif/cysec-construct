@@ -43,9 +43,29 @@ export default function DataImportPage({ supabase, organizationId, onBack }: Pro
     const required = requiredFields(type);
     const errors: string[] = [];
     mappedRows.forEach((row, i) => required.forEach(field => { if (!row[field]?.trim()) errors.push(`Row ${i + 2}: ${field.replaceAll('_',' ')} is required.`); }));
-    if (type === 'stock') mappedRows.forEach((r,i) => { if (r.quantity && Number(r.quantity) <= 0) errors.push(`Row ${i+2}: quantity must be greater than 0.`); });
-    if (type === 'materials') mappedRows.forEach((r,i) => { if (r.gst_rate && (Number(r.gst_rate) < 0 || Number(r.gst_rate) > 100)) errors.push(`Row ${i+2}: GST rate must be between 0 and 100.`); });
-    if (type === 'payments') mappedRows.forEach((r,i) => { if (r.amount && Number(r.amount) <= 0) errors.push(`Row ${i+2}: payment amount must be greater than 0.`); });
+    const checkNumber = (value: string, field: string, row: number, options: { min?: number; max?: number; exclusiveMin?: boolean } = {}) => {
+      if (!value.trim()) return;
+      const n = Number(value);
+      if (!Number.isFinite(n) || (options.exclusiveMin ? n <= (options.min ?? 0) : n < (options.min ?? 0)) || (options.max !== undefined && n > options.max)) {
+        const range = options.max === undefined ? (options.exclusiveMin ? 'greater than' : 'at least') + ` ${options.min ?? 0}` : `between ${options.min ?? 0} and ${options.max}`;
+        errors.push(`Row ${row}: ${field.replaceAll('_', ' ')} must be a valid number ${range}.`);
+      }
+    };
+    mappedRows.forEach((r, i) => {
+      const row = i + 2;
+      if (type === 'stock') checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
+      if (type === 'materials') {
+        checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
+        checkNumber(r.selling_price, 'selling_price', row, { min: 0 });
+        checkNumber(r.quantity, 'quantity', row, { min: 0 });
+      }
+      if (type === 'invoices') {
+        checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
+        checkNumber(r.unit_price, 'unit_price', row, { min: 0 });
+        checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
+      }
+      if (type === 'payments') checkNumber(r.amount, 'amount', row, { min: 0, exclusiveMin: true });
+    });
     return [...new Set(errors)];
   }, [mappedRows, type]);
 
