@@ -1,102 +1,70 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import './reports.css';
-
-const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
 
 type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
-type Invoice = { id: string; invoice_number: string | null; invoice_date: string; status: string; discount_amount_paise: number; subtotal_paise: number; taxable_value_paise: number; total_gst_paise: number; grand_total_paise: number };
-type Payment = { id: string; invoice_id: string; amount_paise: number; payment_date: string; payment_method: string };
-type Movement = { id: string; material_id: string; movement_type: string; quantity: number; created_at: string; materials?: { name: string }[] | null };
-type CustomerBalance = { customer_id: string; name: string; total_invoiced_paise: number; total_paid_paise: number; total_pending_paise: number };
+type ContractFinance = { contract_id:string; client_company_name:string; contract_number:string; title:string; original_value_paise:number; revised_value_paise:number; total_billed_paise:number; total_received_paise:number; total_deductions_paise:number; retention_paise:number; pending_receivable_paise:number; unbilled_contract_value_paise:number };
+type Bill = { bill_id:string; contract_id:string; bill_number:string; bill_date:string; amount_claimed_paise:number; received_paise:number; deducted_paise:number; retention_paise:number; pending_receivable_paise:number; status:string };
+type Purchase = { id:string; purchase_number:string|null; purchase_date:string; total_amount_paise:number; vendors?:{name:string}|null };
+type Advance = { id:string; advance_date:string; amount_paise:number; contractors?:{name:string}|null; contractor_work_orders?:{po_number:string}|null };
+type WorkOrder = { work_order_id:string; contractor_name:string; po_number:string; agreed_work_amount_paise:number; total_advances_paise:number; settlement_final_payable_paise:number; settlement_paid_paise:number; settlement_pending_paise:number|null; status:string };
+type Material = { id:string; name:string; current_quantity:number; purchase_price_paise:number; units?:{short_code:string}|null };
+type Settlement = { id:string; settlement_number:string; settlement_date:string; final_payable_paise:number; recovery_due_paise:number; status:string };
 
-const today = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
-const fyStart = () => { const d = new Date(); const year = d.getFullYear(); const month = d.getMonth() + 1; return `${month >= 4 ? year : year - 1}-04-01`; };
+const money = new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2});
+const today = () => new Date().toISOString().slice(0,10);
+const monthStart = () => { const d=new Date(); d.setDate(1); return d.toISOString().slice(0,10); };
+const fyStart = () => { const d=new Date(); const y=d.getFullYear(); return `${d.getMonth()+1>=4?y:y-1}-04-01`; };
+const inr = (v:number) => money.format(Number(v||0)/100);
 
-export default function ReportsPage({ supabase, organizationId, onBack }: Props) {
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(today());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [movements, setMovements] = useState<Movement[]>([]);
-  const [balances, setBalances] = useState<CustomerBalance[]>([]);
-
-  async function load() {
-    setLoading(true); setError('');
-    const [invoiceResult, paymentResult, movementResult, balanceResult] = await Promise.all([
-      supabase.from('invoices').select('id,invoice_number,invoice_date,status,discount_amount_paise,subtotal_paise,taxable_value_paise,total_gst_paise,grand_total_paise').eq('organization_id', organizationId).gte('invoice_date', from).lte('invoice_date', to).order('invoice_date', { ascending: false }),
-      supabase.from('payments').select('id,invoice_id,amount_paise,payment_date,payment_method').eq('organization_id', organizationId).gte('payment_date', from).lte('payment_date', to).order('payment_date', { ascending: false }),
-      supabase.from('stock_movements').select('id,material_id,movement_type,quantity,created_at,materials(name)').eq('organization_id', organizationId).gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59.999`).order('created_at', { ascending: false }),
-      supabase.from('customer_balance_summary').select('customer_id,name,total_invoiced_paise,total_paid_paise,total_pending_paise').eq('organization_id', organizationId).order('total_pending_paise', { ascending: false }).limit(20),
-    ]);
-    if (invoiceResult.error || paymentResult.error || movementResult.error || balanceResult.error) {
-      setError(invoiceResult.error?.message || paymentResult.error?.message || movementResult.error?.message || balanceResult.error?.message || 'Could not load reports.');
-      setLoading(false); return;
-    }
-    setInvoices((invoiceResult.data ?? []) as Invoice[]);
-    setPayments((paymentResult.data ?? []) as Payment[]);
-    setMovements((movementResult.data ?? []) as Movement[]);
-    setBalances((balanceResult.data ?? []) as CustomerBalance[]);
-    setLoading(false);
-  }
-
-  useEffect(() => { void load(); }, [organizationId, from, to]);
-
-  const issued = useMemo(() => invoices.filter(i => i.status === 'issued'), [invoices]);
-  const cancelled = useMemo(() => invoices.filter(i => i.status === 'cancelled'), [invoices]);
-  const sales = useMemo(() => ({
-    invoices: issued.length,
-    subtotal: issued.reduce((s, i) => s + Number(i.subtotal_paise), 0),
-    discounts: issued.reduce((s, i) => s + Number(i.discount_amount_paise), 0),
-    taxable: issued.reduce((s, i) => s + Number(i.taxable_value_paise), 0),
-    gst: issued.reduce((s, i) => s + Number(i.total_gst_paise), 0),
-    total: issued.reduce((s, i) => s + Number(i.grand_total_paise), 0),
-  }), [issued]);
-  const collected = payments.reduce((s, p) => s + Number(p.amount_paise), 0);
-  const outstanding = balances.reduce((s, b) => s + Number(b.total_pending_paise), 0);
-  const stockIn = movements.filter(m => ['opening', 'purchase', 'adjustment_in', 'return_in'].includes(m.movement_type)).reduce((s, m) => s + Number(m.quantity), 0);
-  const stockOut = movements.filter(m => ['sale', 'adjustment_out', 'return_out'].includes(m.movement_type)).reduce((s, m) => s + Number(m.quantity), 0);
-
-  return <main className="main-content reports-page">
-    <button className="back-link" onClick={onBack}>← Back to dashboard</button>
-    <header className="topbar"><div><p className="eyebrow">Reports</p><h1>Business reports</h1></div></header>
-    <section className="report-toolbar">
-      <div><span>From</span><input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} /></div>
-      <div><span>To</span><input type="date" value={to} min={from} max={today()} onChange={e => setTo(e.target.value)} /></div>
-      <div className="report-presets"><button onClick={() => { setFrom(today()); setTo(today()); }}>Today</button><button onClick={() => { setFrom(monthStart()); setTo(today()); }}>This month</button><button onClick={() => { setFrom(fyStart()); setTo(today()); }}>Current FY</button></div>
-      <span className="report-status">{loading ? 'Refreshing…' : `${issued.length} issued invoices`}</span>
-    </section>
-    {error && <div className="alert error page-alert">{error}</div>}
-
-    <section className="report-metrics">
-      <div className="metric"><span>Sales</span><strong>{money.format(sales.total / 100)}</strong><small>{sales.invoices} issued invoices</small></div>
-      <div className="metric"><span>Payments collected</span><strong>{money.format(collected / 100)}</strong><small>{payments.length} payments in period</small></div>
-      <div className="metric"><span>Outstanding receivables</span><strong>{money.format(outstanding / 100)}</strong><small>Across active customer balances</small></div>
-      <div className="metric"><span>GST</span><strong>{money.format(sales.gst / 100)}</strong><small>On issued invoices</small></div>
-    </section>
-
-    <section className="reports-grid">
-      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Sales</p><h3>Sales summary</h3></div></div><div className="report-lines">
-        <span><b>Subtotal</b><strong>{money.format(sales.subtotal / 100)}</strong></span>
-        <span><b>Discounts</b><strong>{money.format(sales.discounts / 100)}</strong></span>
-        <span><b>Taxable value</b><strong>{money.format(sales.taxable / 100)}</strong></span>
-        <span><b>GST</b><strong>{money.format(sales.gst / 100)}</strong></span>
-        <span className="report-grand"><b>Grand total</b><strong>{money.format(sales.total / 100)}</strong></span>
-      </div></div>
-      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Stock</p><h3>Movement summary</h3></div></div><div className="report-lines">
-        <span><b>Stock in</b><strong>{stockIn.toLocaleString('en-IN')}</strong></span>
-        <span><b>Stock out</b><strong>{stockOut.toLocaleString('en-IN')}</strong></span>
-        <span><b>Net movement</b><strong>{(stockIn - stockOut).toLocaleString('en-IN')}</strong></span>
-        <span><b>Movement records</b><strong>{movements.length}</strong></span>
-        <span className="report-note">Quantities are combined across units; use the ledger for material-level detail.</span>
-      </div></div>
-    </section>
-
-    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Receivables</p><h3>Customer balances</h3></div><span>Top 20 by outstanding amount</span></div><table><thead><tr><th>Customer</th><th>Invoiced</th><th>Paid</th><th>Outstanding</th></tr></thead><tbody>{balances.length === 0 ? <tr><td colSpan={4}><div className="table-empty">No customer balances found.</div></td></tr> : balances.map(b => <tr key={b.customer_id}><td><strong>{b.name}</strong></td><td>{money.format(Number(b.total_invoiced_paise) / 100)}</td><td>{money.format(Number(b.total_paid_paise) / 100)}</td><td><strong>{money.format(Number(b.total_pending_paise) / 100)}</strong></td></tr>)}</tbody></table></section>
-
-    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Invoices</p><h3>Period activity</h3></div><span>{cancelled.length} cancelled</span></div><table><thead><tr><th>Invoice</th><th>Date</th><th>Status</th><th>Amount</th></tr></thead><tbody>{invoices.length === 0 ? <tr><td colSpan={4}><div className="table-empty">No invoices in this period.</div></td></tr> : invoices.slice(0, 50).map(i => <tr key={i.id}><td><strong>{i.invoice_number || 'Draft'}</strong></td><td>{new Date(i.invoice_date).toLocaleDateString('en-IN')}</td><td><span className={`pill ${i.status === 'issued' ? 'active' : ''}`}>{i.status.charAt(0).toUpperCase() + i.status.slice(1)}</span></td><td>{money.format(Number(i.grand_total_paise) / 100)}</td></tr>)}</tbody></table></section>
-  </main>;
+export default function ReportsPage({supabase,organizationId,onBack}:Props){
+ const [from,setFrom]=useState(monthStart()),[to,setTo]=useState(today()),[loading,setLoading]=useState(false),[error,setError]=useState('');
+ const [contracts,setContracts]=useState<ContractFinance[]>([]),[bills,setBills]=useState<Bill[]>([]),[purchases,setPurchases]=useState<Purchase[]>([]),[advances,setAdvances]=useState<Advance[]>([]),[workOrders,setWorkOrders]=useState<WorkOrder[]>([]),[materials,setMaterials]=useState<Material[]>([]),[settlements,setSettlements]=useState<Settlement[]>([]);
+ async function load(){
+  setLoading(true);setError('');
+  const [c,b,p,a,w,m,s]=await Promise.all([
+   supabase.from('contract_finance_summary').select('*').eq('organization_id',organizationId).order('contract_number'),
+   supabase.from('client_bill_finance_summary').select('*').eq('organization_id',organizationId).gte('bill_date',from).lte('bill_date',to).order('bill_date',{ascending:false}),
+   supabase.from('material_purchases').select('id,purchase_number,purchase_date,total_amount_paise,vendors(name)').eq('organization_id',organizationId).gte('purchase_date',from).lte('purchase_date',to).order('purchase_date',{ascending:false}),
+   supabase.from('contractor_advances').select('id,advance_date,amount_paise,contractors(name),contractor_work_orders(po_number)').eq('organization_id',organizationId).gte('advance_date',from).lte('advance_date',to).order('advance_date',{ascending:false}),
+   supabase.from('contractor_work_order_summary').select('*').eq('organization_id',organizationId).order('po_number'),
+   supabase.from('materials').select('id,name,current_quantity,purchase_price_paise,units(short_code)').eq('organization_id',organizationId).eq('is_active',true).order('name'),
+   supabase.from('contractor_settlements').select('id,settlement_number,settlement_date,final_payable_paise,recovery_due_paise,status').eq('organization_id',organizationId).gte('settlement_date',from).lte('settlement_date',to).order('settlement_date',{ascending:false})
+  ]);
+  const failure=c.error||b.error||p.error||a.error||w.error||m.error||s.error;
+  if(failure){setError(failure.message);setLoading(false);return;}
+  setContracts((c.data??[]) as ContractFinance[]);setBills((b.data??[]) as Bill[]);setPurchases((p.data??[]) as unknown as Purchase[]);setAdvances((a.data??[]) as unknown as Advance[]);setWorkOrders((w.data??[]) as WorkOrder[]);setMaterials((m.data??[]) as unknown as Material[]);setSettlements((s.data??[]) as Settlement[]);setLoading(false);
+ }
+ useEffect(()=>{void load();},[supabase,organizationId,from,to]);
+ const totals=useMemo(()=>({
+  contractValue:contracts.reduce((n,x)=>n+Number(x.revised_value_paise),0),
+  received:contracts.reduce((n,x)=>n+Number(x.total_received_paise),0),
+  receivable:contracts.reduce((n,x)=>n+Number(x.pending_receivable_paise),0),
+  billed:bills.reduce((n,x)=>n+Number(x.amount_claimed_paise),0),
+  billPending:bills.reduce((n,x)=>n+Number(x.pending_receivable_paise),0),
+  purchase:purchases.reduce((n,x)=>n+Number(x.total_amount_paise),0),
+  advances:advances.reduce((n,x)=>n+Number(x.amount_paise),0),
+  stock:materials.reduce((n,x)=>n+Number(x.current_quantity)*Number(x.purchase_price_paise),0),
+  settlementPayable:settlements.reduce((n,x)=>n+Number(x.final_payable_paise),0),
+  recovery:settlements.reduce((n,x)=>n+Number(x.recovery_due_paise),0)
+ }),[contracts,bills,purchases,advances,materials,settlements]);
+ const activeOrders=workOrders.filter(x=>['active','on_hold','settlement_pending'].includes(x.status));
+ return <main className="main-content reports-page">
+  <button className="back-link" onClick={onBack}>← Overview</button>
+  <header className="topbar"><div><p className="eyebrow">Management reporting</p><h1>Construction reports</h1><p className="page-subtitle">Project finance, procurement, inventory and contractor performance.</p></div></header>
+  <section className="report-toolbar"><div><span>From</span><input type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></div><div><span>To</span><input type="date" value={to} min={from} max={today()} onChange={e=>setTo(e.target.value)}/></div><div className="report-presets"><button onClick={()=>{setFrom(today());setTo(today());}}>Today</button><button onClick={()=>{setFrom(monthStart());setTo(today());}}>This month</button><button onClick={()=>{setFrom(fyStart());setTo(today());}}>Current FY</button></div><span className="report-status">{loading?'Refreshing…':`Updated for ${from} to ${to}`}</span></section>
+  {error&&<div className="alert error page-alert">{error}</div>}
+  <p className="eyebrow">Contract portfolio · all active and historical contracts</p>
+  <section className="report-metrics"><div className="metric"><span>Revised contract value</span><strong>{inr(totals.contractValue)}</strong><small>{contracts.length} contracts</small></div><div className="metric"><span>Client receipts</span><strong>{inr(totals.received)}</strong><small>All recorded receipts</small></div><div className="metric"><span>Pending receivables</span><strong>{inr(totals.receivable)}</strong><small>Across contracts</small></div><div className="metric"><span>Stock at purchase cost</span><strong>{inr(totals.stock)}</strong><small>{materials.length} active materials</small></div></section>
+  <section className="reports-grid">
+   <div className="report-card"><div className="section-head"><div><p className="eyebrow">Client billing · selected period</p><h3>Client bills & receivables</h3></div></div><div className="report-lines"><span><b>Claims raised</b><strong>{inr(totals.billed)}</strong></span><span><b>Pending on period bills</b><strong>{inr(totals.billPending)}</strong></span><span><b>Bill records</b><strong>{bills.length}</strong></span><span><b>Retention held</b><strong>{inr(bills.reduce((n,x)=>n+Number(x.retention_paise),0))}</strong></span></div></div>
+   <div className="report-card"><div className="section-head"><div><p className="eyebrow">Procurement · selected period</p><h3>Vendor purchases</h3></div></div><div className="report-lines"><span><b>Purchase value</b><strong>{inr(totals.purchase)}</strong></span><span><b>Purchase records</b><strong>{purchases.length}</strong></span><span><b>Contractor advances</b><strong>{inr(totals.advances)}</strong></span><span><b>Advance transactions</b><strong>{advances.length}</strong></span></div></div>
+   <div className="report-card"><div className="section-head"><div><p className="eyebrow">Contractor performance</p><h3>Work orders & settlements</h3></div></div><div className="report-lines"><span><b>Active / on-hold work orders</b><strong>{activeOrders.length}</strong></span><span><b>Settlement payable</b><strong>{inr(totals.settlementPayable)}</strong></span><span><b>Recovery due</b><strong>{inr(totals.recovery)}</strong></span><span><b>Settlements in period</b><strong>{settlements.length}</strong></span></div></div>
+  </section>
+  <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Project management</p><h3>Contract finance by client</h3></div><span>{contracts.length} contracts · all time</span></div><table><thead><tr><th>Contract</th><th>Client</th><th>Revised value</th><th>Billed</th><th>Received</th><th>Retention</th><th>Pending</th><th>Unbilled</th></tr></thead><tbody>{contracts.length===0?<tr><td colSpan={8}><div className="table-empty">No contract finance records yet.</div></td></tr>:contracts.map(x=><tr key={x.contract_id}><td><strong>{x.contract_number}</strong><small>{x.title}</small></td><td>{x.client_company_name}</td><td>{inr(x.revised_value_paise)}</td><td>{inr(x.total_billed_paise)}</td><td>{inr(x.total_received_paise)}</td><td>{inr(x.retention_paise)}</td><td><strong>{inr(x.pending_receivable_paise)}</strong></td><td>{inr(x.unbilled_contract_value_paise)}</td></tr>)}</tbody></table></section>
+  <section className="reports-grid">
+   <div className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Contractor control</p><h3>Work order position</h3></div></div><table><thead><tr><th>PO / Contractor</th><th>Agreed amount</th><th>Advances</th><th>Settlement pending</th><th>Status</th></tr></thead><tbody>{workOrders.length===0?<tr><td colSpan={5}>No work orders recorded.</td></tr>:workOrders.slice(0,30).map(x=><tr key={x.work_order_id}><td><strong>{x.po_number}</strong><small>{x.contractor_name}</small></td><td>{inr(x.agreed_work_amount_paise)}</td><td>{inr(x.total_advances_paise)}</td><td>{x.settlement_pending_paise==null?'—':inr(x.settlement_pending_paise)}</td><td>{x.status}</td></tr>)}</tbody></table></div>
+   <div className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Inventory</p><h3>Material stock valuation</h3></div></div><table><thead><tr><th>Material</th><th>Available</th><th>Unit</th><th>Purchase cost value</th></tr></thead><tbody>{materials.length===0?<tr><td colSpan={4}>No active materials.</td></tr>:materials.slice(0,30).map(x=><tr key={x.id}><td><strong>{x.name}</strong></td><td>{Number(x.current_quantity).toLocaleString('en-IN',{maximumFractionDigits:3})}</td><td>{x.units?.short_code||'—'}</td><td>{inr(Number(x.current_quantity)*Number(x.purchase_price_paise))}</td></tr>)}</tbody></table></div>
+  </section>
+  <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Period activity</p><h3>Vendor purchases & contractor advances</h3></div><span>{purchases.length+advances.length} transactions</span></div><table><thead><tr><th>Date</th><th>Type</th><th>Reference / party</th><th>Amount</th></tr></thead><tbody>{[...purchases.map(x=>({id:x.id,date:x.purchase_date,type:'Vendor purchase',reference:x.purchase_number||x.vendors?.name||'Purchase',amount:Number(x.total_amount_paise)})),...advances.map(x=>({id:x.id,date:x.advance_date,type:'Contractor advance',reference:x.contractor_work_orders?.po_number||x.contractors?.name||'Advance',amount:Number(x.amount_paise)}))].sort((x,y)=>y.date.localeCompare(x.date)).slice(0,50).map(x=><tr key={x.id}><td>{new Date(x.date).toLocaleDateString('en-IN')}</td><td>{x.type}</td><td>{x.reference}</td><td>{inr(x.amount)}</td></tr>)}</tbody></table></section>
+ </main>;
 }
