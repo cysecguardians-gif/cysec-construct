@@ -30,5 +30,5 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running Material Management System");
+        .expect("error while running BuildSphere");
 }

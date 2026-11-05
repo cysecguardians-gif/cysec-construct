@@ -43,7 +43,7 @@ jobs:
           $graphics.FillRectangle($brush, 24, 24, 208, 208)
           $font = New-Object System.Drawing.Font('Arial', 88, [System.Drawing.FontStyle]::Bold)
           $textBrush = New-Object System.Drawing.SolidBrush([System.Drawing.Color]::White)
-          $graphics.DrawString('MM', $font, $textBrush, 31, 75)
+          $graphics.DrawString('BS', $font, $textBrush, 31, 75)
           $bitmap.Save('src-tauri/icon-source.png', [System.Drawing.Imaging.ImageFormat]::Png)
           $graphics.Dispose()
           $brush.Dispose()
@@ -68,7 +68,7 @@ jobs:
       - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
-          name: material-management-system-windows
+          name: buildsphere-windows
           path: |
             src-tauri/target/release/bundle/nsis/*.exe
             src-tauri/target/release/bundle/msi/*.msi
