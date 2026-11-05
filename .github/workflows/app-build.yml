@@ -2,7 +2,7 @@ name: App Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, release/cysec-construct-branding-recovery]
   pull_request:
     branches: [main]
 
