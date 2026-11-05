@@ -10,8 +10,9 @@ type Payment = { id: string; invoice_id: string; amount_paise: number; payment_d
 type Movement = { id: string; material_id: string; movement_type: string; quantity: number; created_at: string; materials?: { name: string }[] | null };
 type CustomerBalance = { customer_id: string; name: string; total_invoiced_paise: number; total_paid_paise: number; total_pending_paise: number };
 
-const today = () => new Date().toISOString().slice(0, 10);
-const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
+const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const today = () => localDate(new Date());
+const monthStart = () => { const d = new Date(); d.setDate(1); return localDate(d); };
 const fyStart = () => { const d = new Date(); const year = d.getFullYear(); const month = d.getMonth() + 1; return `${month >= 4 ? year : year - 1}-04-01`; };
 
 export default function ReportsPage({ supabase, organizationId, onBack }: Props) {
@@ -57,8 +58,8 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
   }), [issued]);
   const collected = payments.reduce((s, p) => s + Number(p.amount_paise), 0);
   const outstanding = balances.reduce((s, b) => s + Number(b.total_pending_paise), 0);
-  const stockIn = movements.filter(m => ['opening', 'purchase', 'adjustment_in', 'return_in'].includes(m.movement_type)).reduce((s, m) => s + Number(m.quantity), 0);
-  const stockOut = movements.filter(m => ['sale', 'adjustment_out', 'return_out'].includes(m.movement_type)).reduce((s, m) => s + Number(m.quantity), 0);
+  const stockInCount = movements.filter(m => ['opening', 'purchase', 'adjustment_in', 'return_in'].includes(m.movement_type)).length;
+  const stockOutCount = movements.filter(m => ['sale', 'adjustment_out', 'return_out'].includes(m.movement_type)).length;
 
   return <main className="main-content reports-page">
     <button className="back-link" onClick={onBack}>← Back to dashboard</button>
@@ -74,7 +75,7 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
     <section className="report-metrics">
       <div className="metric"><span>Sales</span><strong>{money.format(sales.total / 100)}</strong><small>{sales.invoices} issued invoices</small></div>
       <div className="metric"><span>Payments collected</span><strong>{money.format(collected / 100)}</strong><small>{payments.length} payments in period</small></div>
-      <div className="metric"><span>Outstanding receivables</span><strong>{money.format(outstanding / 100)}</strong><small>Across active customer balances</small></div>
+      <div className="metric"><span>Top 20 receivables</span><strong>{money.format(outstanding / 100)}</strong><small>Sum of the 20 largest customer balances, not company total</small></div>
       <div className="metric"><span>GST</span><strong>{money.format(sales.gst / 100)}</strong><small>On issued invoices</small></div>
     </section>
 
@@ -87,11 +88,10 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
         <span className="report-grand"><b>Grand total</b><strong>{money.format(sales.total / 100)}</strong></span>
       </div></div>
       <div className="report-card"><div className="section-head"><div><p className="eyebrow">Stock</p><h3>Movement summary</h3></div></div><div className="report-lines">
-        <span><b>Stock in</b><strong>{stockIn.toLocaleString('en-IN')}</strong></span>
-        <span><b>Stock out</b><strong>{stockOut.toLocaleString('en-IN')}</strong></span>
-        <span><b>Net movement</b><strong>{(stockIn - stockOut).toLocaleString('en-IN')}</strong></span>
+        <span><b>Inbound movements</b><strong>{stockInCount.toLocaleString('en-IN')}</strong></span>
+        <span><b>Outbound movements</b><strong>{stockOutCount.toLocaleString('en-IN')}</strong></span>
         <span><b>Movement records</b><strong>{movements.length}</strong></span>
-        <span className="report-note">Quantities are combined across units; use the ledger for material-level detail.</span>
+        <span className="report-note">Movement counts only. Quantities from different materials and units cannot be combined.</span>
       </div></div>
     </section>
 
