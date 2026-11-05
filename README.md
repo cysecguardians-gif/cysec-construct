@@ -1,6 +1,6 @@
-# BuildSphere
+# CySec Construct
 
-BuildSphere is a reusable Windows desktop application for construction contract finance, vendor procurement, material inventory, contractor work orders, daily material issues, advances, reconciliation and contractor settlement. It is published by CySec Guardians. Each business owns and manages its own Supabase project and business data.
+CySec Construct is a reusable Windows desktop application for construction contract finance, vendor procurement, material inventory, contractor work orders, daily material issues, advances, reconciliation and contractor settlement. It is published by CySec Guardians. Each business owns and manages its own Supabase project and business data.
 
 ## Product goals
 
@@ -31,7 +31,7 @@ GitHub repository (product source + SQL migrations + documentation)
                          |
                   Build / install
                          |
-                BuildSphere desktop app
+                CySec Construct desktop app
                  (React + Tauri)
                          |
              HTTPS / Supabase client
@@ -61,7 +61,7 @@ The desktop app may be configured with a Supabase project URL and a publishable 
 
 ## Current status
 
-This repository contains the BuildSphere product foundation and construction workflow implementation. Further work should preserve customer-owned Supabase deployments, existing data, and the established database security model.
+This repository contains the CySec Construct product foundation and construction workflow implementation. Further work should preserve customer-owned Supabase deployments, existing data, and the established database security model.
 
 ## Security baseline
 
