@@ -17,6 +17,7 @@ type Purchase = { id: string; purchase_number: string | null; vendor_invoice_num
 type Material = { id: string; name: string; current_quantity: number; purchase_price_paise: number };
 type Issue = { id: string; issue_number: string | null; issue_date: string; work_order_id: string; material_issue_items: { description_snapshot: string; quantity_issued: number; contractor_unit_rate_paise: number }[] };
 type MaterialReturn = { id: string; return_number: string | null; return_date: string; material_return_items: { quantity_returned: number; condition: string }[] };
+type Settlement = { id: string; work_order_id: string; settlement_number: string; settlement_date: string; recovery_due_paise: number; status: string };
 
 export default function ReportsPage({ supabase, organizationId, onBack }: Props) {
   const [from, setFrom] = useState(monthStart());
@@ -30,6 +31,7 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
   const [materials, setMaterials] = useState<Material[]>([]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [returns, setReturns] = useState<MaterialReturn[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
 
   async function load() {
     setLoading(true); setError('');
@@ -40,7 +42,8 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
       supabase.from('material_purchases').select('id,purchase_number,vendor_invoice_number,purchase_date,total_amount_paise,payment_status,vendors(name)').eq('organization_id', organizationId).gte('purchase_date', from).lte('purchase_date', to).order('purchase_date', { ascending: false }),
       supabase.from('materials').select('id,name,current_quantity,purchase_price_paise').eq('organization_id', organizationId).eq('is_active', true).order('name'),
       supabase.from('material_issues').select('id,issue_number,issue_date,work_order_id,material_issue_items(description_snapshot,quantity_issued,contractor_unit_rate_paise)').eq('organization_id', organizationId).gte('issue_date', from).lte('issue_date', to).neq('status','cancelled').order('issue_date',{ascending:false}),
-      supabase.from('material_returns').select('id,return_number,return_date,material_return_items(quantity_returned,condition)').eq('organization_id', organizationId).gte('return_date', from).lte('return_date', to).order('return_date',{ascending:false})
+      supabase.from('material_returns').select('id,return_number,return_date,material_return_items(quantity_returned,condition)').eq('organization_id', organizationId).gte('return_date', from).lte('return_date', to).order('return_date',{ascending:false}),
+      supabase.from('contractor_settlements').select('id,work_order_id,settlement_number,settlement_date,recovery_due_paise,status').eq('organization_id', organizationId).neq('status','cancelled').order('settlement_date',{ascending:false})
     ]);
     const failure = results.find(r => r.error);
     if (failure?.error) { setError(failure.error.message); setLoading(false); return; }
@@ -51,6 +54,7 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
     setMaterials((results[4].data || []) as Material[]);
     setIssues((results[5].data || []) as unknown as Issue[]);
     setReturns((results[6].data || []) as unknown as MaterialReturn[]);
+    setSettlements((results[7].data || []) as Settlement[]);
     setLoading(false);
   }
   useEffect(() => { void load(); }, [organizationId, from, to]);
@@ -70,7 +74,7 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
     paid: a.paid + Number(w.settlement_paid_paise), pending: a.pending + Number(w.settlement_pending_paise || 0)
   }), { agreed: 0, advances: 0, paid: 0, pending: 0 });
   const purchaseTotal = purchases.reduce((s, p) => s + Number(p.total_amount_paise), 0);
-  const stockQuantity = materials.reduce((s, m) => s + Number(m.current_quantity), 0);
+  const recoveryDue = settlements.reduce((s, item) => s + Number(item.recovery_due_paise), 0);
   const stockValue = materials.reduce((s, m) => s + Number(m.current_quantity) * Number(m.purchase_price_paise || 0), 0);
   const issueQuantity = issues.reduce((s, issue) => s + issue.material_issue_items.reduce((n, line) => n + Number(line.quantity_issued), 0), 0);
   const issueValue = issues.reduce((s, issue) => s + issue.material_issue_items.reduce((n, line) => n + Number(line.quantity_issued) * Number(line.contractor_unit_rate_paise), 0), 0);
@@ -92,6 +96,7 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
       <div className="metric"><span>Vendor purchases</span><strong>{rupees(purchaseTotal)}</strong><small>{purchases.length} purchases in period</small></div>
       <div className="metric"><span>Settlement pending</span><strong>{rupees(workTotals.pending)}</strong><small>{workOrders.length} work orders</small></div>
       <div className="metric"><span>Stock at purchase value</span><strong>{rupees(stockValue)}</strong><small>{materials.length} active materials</small></div>
+      <div className="metric"><span>Contractor recovery due</span><strong>{rupees(recoveryDue)}</strong><small>{settlements.filter(s => Number(s.recovery_due_paise) > 0).length} settlements with recovery</small></div>
     </section>
     <section className="reports-grid">
       <div className="report-card"><div className="section-head"><div><p className="eyebrow">Project finance · all history</p><h3>Contract portfolio</h3></div></div><div className="report-lines">
@@ -104,7 +109,7 @@ export default function ReportsPage({ supabase, organizationId, onBack }: Props)
         <span><b>Purchase value</b><strong>{rupees(purchaseTotal)}</strong></span><span><b>Purchase records</b><strong>{purchases.length}</strong></span><span><b>Unpaid records</b><strong>{purchases.filter(p => p.payment_status === 'unpaid').length}</strong></span><span><b>Partially paid</b><strong>{purchases.filter(p => p.payment_status === 'partially_paid').length}</strong></span><span className="report-grand"><b>Material issue charge value</b><strong>{rupees(issueValue)}</strong></span>
       </div></div>
       <div className="report-card"><div className="section-head"><div><p className="eyebrow">Contractor finance · all history</p><h3>Work order & settlement</h3></div></div><div className="report-lines">
-        <span><b>Agreed work value</b><strong>{rupees(workTotals.agreed)}</strong></span><span><b>Advances issued</b><strong>{rupees(workTotals.advances)}</strong></span><span><b>Settlement payments</b><strong>{rupees(workTotals.paid)}</strong></span><span><b>Material quantity issued</b><strong>{quantity(issueQuantity)}</strong></span><span><b>Material quantity returned</b><strong>{quantity(returnedQuantity)}</strong></span><span className="report-grand"><b>Settlement balance</b><strong>{rupees(workTotals.pending)}</strong></span>
+        <span><b>Agreed work value</b><strong>{rupees(workTotals.agreed)}</strong></span><span><b>Advances issued</b><strong>{rupees(workTotals.advances)}</strong></span><span><b>Settlement payments</b><strong>{rupees(workTotals.paid)}</strong></span><span><b>Recovery due</b><strong>{rupees(recoveryDue)}</strong></span><span><b>Material quantity issued</b><strong>{quantity(issueQuantity)}</strong></span><span><b>Material quantity returned</b><strong>{quantity(returnedQuantity)}</strong></span><span className="report-grand"><b>Settlement balance</b><strong>{rupees(workTotals.pending)}</strong></span>
       </div></div>
     </section>
     <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Project finance</p><h3>Contract performance</h3></div><span>Portfolio totals are all-time</span></div><table><thead><tr><th>Contract / client</th><th>Revised value</th><th>Billed</th><th>Received</th><th>Pending</th><th>Unbilled</th></tr></thead><tbody>{contracts.length === 0 ? <tr><td colSpan={6}><div className="table-empty">No contracts found.</div></td></tr> : contracts.map(c => <tr key={c.contract_id}><td><strong>{c.contract_number}</strong><small className="report-subline">{c.title} · {c.client_company_name}</small></td><td>{rupees(c.revised_value_paise)}</td><td>{rupees(c.total_billed_paise)}</td><td>{rupees(c.total_received_paise)}</td><td><strong>{rupees(c.pending_receivable_paise)}</strong></td><td>{rupees(c.unbilled_contract_value_paise)}</td></tr>)}</tbody></table></section>
