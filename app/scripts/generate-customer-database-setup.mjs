@@ -28,18 +28,18 @@ const migrationFiles = [
 const sections = [];
 for (const file of migrationFiles) {
   const source = await fs.readFile(path.join(migrationDir, file), 'utf8');
-  sections.push(`-- Material Management System database setup\n-- Internal migration: ${file}\n-- This file is bundled into the desktop application for customer database initialization.\n\n${source.trim()}`);
+  sections.push(`-- CySec Construct database setup\n-- Internal migration: ${file}\n-- This file is bundled into the desktop application for customer database initialization.\n\n${source.trim()}`);
 }
 
 const sql = [
-  '-- Material Management System — Customer Database Setup',
+  '-- CySec Construct — Customer Database Setup',
   '-- Generated automatically from the version-controlled migrations during the application build.',
   '-- Run this complete script once in the customer-owned Supabase SQL Editor.',
   '-- Do not place a service-role key or database password in the desktop application.',
   '',
   ...sections,
   '',
-  '-- End of Material Management System database setup',
+  '-- End of CySec Construct database setup',
   '',
 ].join('\n\n');
 

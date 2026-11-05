@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Material Management System",
+  "productName": "CySec Construct",
   "version": "0.1.1",
   "identifier": "in.cysecguardians.materialmanagementsystem",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Material Management System",
+        "title": "CySec Construct",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
@@ -28,15 +28,24 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["materialmanagement"]
+        "schemes": [
+          "materialmanagement"
+        ]
       }
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "category": "Business",
-    "shortDescription": "Desktop material, customer, stock and invoice management",
-    "icon": ["icons/icon.ico"]
+    "shortDescription": "Construction contracts, procurement, inventory and contractor settlements",
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "publisher": "CySec Guardians",
+    "longDescription": "CySec Construct is a construction business management desktop application for contracts, procurement, material inventory, contractor work orders, daily material issues, reconciliation and settlements."
   }
 }
