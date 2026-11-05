@@ -24,6 +24,12 @@ declare
   v_user uuid := auth.uid();
   v_amount bigint;
   v_status text;
+  v_group record;
+  v_items jsonb;
+  v_vendor_id uuid;
+  v_work_order_id uuid;
+  v_issue_id uuid;
+  v_line_count integer;
 begin
   if not public.is_org_admin(p_organization_id) then
     raise exception 'administrator_required';
@@ -33,9 +39,132 @@ begin
   end if;
   if p_import_type not in (
     'client_companies','contracts','projects','vendors','contractors',
-    'work_orders','advances','client_bills','client_receipts','client_deductions'
+    'work_orders','advances','client_bills','client_receipts','client_deductions',
+    'material_purchases','material_issues','material_returns'
   ) then
     raise exception 'unsupported_construction_import_type';
+  end if;
+
+  -- Multi-line material transactions are supplied as one spreadsheet row per item.
+  -- Rows sharing the transaction number are grouped and passed to the normal stock RPCs.
+  if p_import_type = 'material_purchases' then
+    for v_group in
+      select value->>'purchase_number' as purchase_number,
+        min(value->>'vendor_name') as vendor_name,
+        min(value->>'purchase_date') as purchase_date,
+        min(value->>'vendor_invoice_number') as vendor_invoice_number,
+        min(value->>'other_charges') as other_charges,
+        min(value->>'notes') as notes,
+        count(distinct value->>'vendor_name') as vendor_count
+      from jsonb_array_elements(p_rows) group by value->>'purchase_number'
+    loop
+      if nullif(trim(v_group.purchase_number),'') is null or v_group.vendor_count<>1 then
+        raise exception 'purchase_number_required_and_vendor_must_match_for_all_lines';
+      end if;
+      if exists(select 1 from public.material_purchases where organization_id=p_organization_id and purchase_number=v_group.purchase_number) then
+        raise exception 'purchase_number_already_exists: %',v_group.purchase_number;
+      end if;
+      select id into v_vendor_id from public.vendors
+        where organization_id=p_organization_id and lower(name)=lower(trim(v_group.vendor_name)) and is_active;
+      if v_vendor_id is null then raise exception 'vendor_not_found_for_purchase: %',v_group.vendor_name; end if;
+      select count(*) into v_line_count from jsonb_array_elements(p_rows) x
+        where x->>'purchase_number'=v_group.purchase_number;
+      select jsonb_agg(jsonb_build_object(
+        'material_id',m.id,'quantity',(x->>'quantity')::numeric,
+        'unit_cost_paise',round((x->>'unit_cost')::numeric*100),
+        'gst_rate',nullif(x->>'gst_rate','')::numeric
+      )) into v_items
+      from jsonb_array_elements(p_rows) x
+      join public.materials m on m.organization_id=p_organization_id and lower(m.name)=lower(trim(x->>'material'))
+      where x->>'purchase_number'=v_group.purchase_number;
+      if coalesce(jsonb_array_length(v_items),0)<>v_line_count then raise exception 'purchase_material_not_found_or_missing: %',v_group.purchase_number; end if;
+      perform public.record_material_purchase(
+        p_organization_id,v_vendor_id,v_items,
+        coalesce(nullif(v_group.purchase_date,'')::date,current_date),v_group.purchase_number,
+        nullif(trim(v_group.vendor_invoice_number),''),round(coalesce(nullif(v_group.other_charges,'')::numeric,0)*100),
+        nullif(trim(v_group.notes),'')
+      );
+      v_count:=v_count+1;
+    end loop;
+
+  elsif p_import_type = 'material_issues' then
+    for v_group in
+      select value->>'issue_number' as issue_number,
+        min(value->>'po_number') as po_number,
+        min(value->>'issue_date') as issue_date,
+        min(value->>'notes') as notes,
+        count(distinct value->>'po_number') as po_count
+      from jsonb_array_elements(p_rows) group by value->>'issue_number'
+    loop
+      if nullif(trim(v_group.issue_number),'') is null or v_group.po_count<>1 then
+        raise exception 'issue_number_required_and_work_order_must_match_for_all_lines';
+      end if;
+      if exists(select 1 from public.material_issues where organization_id=p_organization_id and issue_number=v_group.issue_number) then
+        raise exception 'issue_number_already_exists: %',v_group.issue_number;
+      end if;
+      select id into v_work_order_id from public.contractor_work_orders
+        where organization_id=p_organization_id and po_number=trim(v_group.po_number) and status in ('active','on_hold');
+      if v_work_order_id is null then raise exception 'active_work_order_not_found_for_issue: %',v_group.po_number; end if;
+      select count(*) into v_line_count from jsonb_array_elements(p_rows) x
+        where x->>'issue_number'=v_group.issue_number;
+      select jsonb_agg(jsonb_build_object(
+        'material_id',m.id,'quantity',(x->>'quantity')::numeric,
+        'contractor_unit_rate_paise',case when nullif(x->>'contractor_unit_rate','') is null then null else round((x->>'contractor_unit_rate')::numeric*100) end
+      )) into v_items
+      from jsonb_array_elements(p_rows) x
+      join public.materials m on m.organization_id=p_organization_id and lower(m.name)=lower(trim(x->>'material')) and m.is_active
+      where x->>'issue_number'=v_group.issue_number;
+      if coalesce(jsonb_array_length(v_items),0)<>v_line_count then raise exception 'issue_material_not_found_or_inactive: %',v_group.issue_number; end if;
+      perform public.issue_materials_to_contractor(
+        p_organization_id,v_work_order_id,v_items,
+        coalesce(nullif(v_group.issue_date,'')::date,current_date),v_group.issue_number,
+        nullif(trim(v_group.notes),'')
+      );
+      v_count:=v_count+1;
+    end loop;
+
+  elsif p_import_type = 'material_returns' then
+    for v_group in
+      select value->>'return_number' as return_number,
+        min(value->>'issue_number') as issue_number,
+        min(value->>'return_date') as return_date,
+        min(value->>'notes') as notes,
+        count(distinct value->>'issue_number') as issue_count
+      from jsonb_array_elements(p_rows) group by value->>'return_number'
+    loop
+      if nullif(trim(v_group.return_number),'') is null or v_group.issue_count<>1 then
+        raise exception 'return_number_required_and_issue_must_match_for_all_lines';
+      end if;
+      if exists(select 1 from public.material_returns where organization_id=p_organization_id and return_number=v_group.return_number) then
+        raise exception 'return_number_already_exists: %',v_group.return_number;
+      end if;
+      select id into v_issue_id from public.material_issues
+        where organization_id=p_organization_id and issue_number=trim(v_group.issue_number) and status<>'cancelled';
+      if v_issue_id is null then raise exception 'material_issue_not_found_for_return: %',v_group.issue_number; end if;
+      select count(*) into v_line_count from jsonb_array_elements(p_rows) x
+        where x->>'return_number'=v_group.return_number;
+      select jsonb_agg(jsonb_build_object(
+        'issue_item_id',ii.id,'quantity_returned',(x->>'quantity_returned')::numeric,
+        'condition',coalesce(nullif(x->>'condition',''),'usable'),'notes',nullif(trim(x->>'line_notes'),'')
+      )) into v_items
+      from jsonb_array_elements(p_rows) x
+      join public.material_issue_items ii on ii.issue_id=v_issue_id
+        and lower(ii.description_snapshot)=lower(trim(x->>'material'))
+      where x->>'return_number'=v_group.return_number;
+      if coalesce(jsonb_array_length(v_items),0)<>v_line_count then raise exception 'return_material_not_found_or_ambiguous: %',v_group.return_number; end if;
+      perform public.return_contractor_materials(
+        p_organization_id,v_issue_id,v_items,
+        coalesce(nullif(v_group.return_date,'')::date,current_date),v_group.return_number,
+        nullif(trim(v_group.notes),'')
+      );
+      v_count:=v_count+1;
+    end loop;
+  end if;
+
+  if p_import_type in ('material_purchases','material_issues','material_returns') then
+    insert into public.audit_log(organization_id,user_id,action,entity_type,details)
+    values(p_organization_id,v_user,'historical_import','construction_'||p_import_type,jsonb_build_object('transactions',v_count));
+    return jsonb_build_object('imported_transactions',v_count,'import_type',p_import_type);
   end if;
 
   for v_row in select value from jsonb_array_elements(p_rows) loop
