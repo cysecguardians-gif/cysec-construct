@@ -14,3 +14,12 @@
 .table-card h3{margin:0 0 12px;font-size:15px}
 .table-card .hint{margin:0 0 14px}
 @media(max-width:1200px){.purchase-line{grid-template-columns:1fr 1fr}.toolbar-actions{flex-wrap:wrap}}
+
+
+/* Keep navigation and workspace scrolling independent. */
+.app-shell{height:100vh;min-height:0;overflow:hidden}
+.sidebar{height:100vh;min-height:0;overflow:hidden}
+.sidebar nav{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.sidebar-footer{flex:0 0 auto}
+.main-content{height:100vh;min-height:0;min-width:0;overflow-y:auto;overscroll-behavior:contain}
+@media print{.app-shell,.sidebar,.main-content{height:auto;min-height:0;overflow:visible}}
