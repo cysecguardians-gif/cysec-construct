@@ -26,7 +26,7 @@ export default function ContractorClosurePage({supabase,organizationId,onBack}:{
  }
  useEffect(()=>{void load()},[organizationId]);
  const selected=workOrders.find(w=>w.work_order_id===selectedId);
- const settlement=settlements.find(s=>s.work_order_id===selectedId);
+ const settlement=settlements.find(s=>s.work_order_id===selectedId&&s.status!=='cancelled');
  async function selectWorkOrder(id:string){
   setSelectedId(id);setError('');setMessage('');setLines([]);setReconcile({});setReturns({});
   if(!id)return;
@@ -41,7 +41,7 @@ export default function ContractorClosurePage({supabase,organizationId,onBack}:{
   for(const row of rows)returnForm[row.id]={quantity:'',condition:'usable',notes:''};
   setReturns(returnForm);
  }
- const totals=useMemo(()=>lines.reduce((acc,line)=>{const returned=line.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;const used=Number(reconcile[line.id]?.used||0);const unaccounted=Math.max(Number(line.quantity_issued)-returned-used,0);acc.issued+=Number(line.quantity_issued);acc.returned+=returned;acc.used+=used;acc.unaccounted+=unaccounted;acc.charge+=Math.max(Number(line.quantity_issued)-returned,0)*Number(line.contractor_unit_rate_paise);return acc;},{issued:0,returned:0,used:0,unaccounted:0,charge:0}),[lines,reconcile]);
+ const totals=useMemo(()=>lines.reduce((acc,line)=>{const returned=line.material_return_items?.reduce((s,r)=>s+Number(r.quantity_returned),0)||0;const used=Number(reconcile[line.id]?.used||0);const unaccounted=Math.max(Number(line.quantity_issued)-returned-used,0);acc.issued+=Number(line.quantity_issued);acc.returned+=returned;acc.used+=used;acc.unaccounted+=unaccounted;const usableReturned=line.material_return_items?.filter(r=>r.condition==='usable').reduce((s,r)=>s+Number(r.quantity_returned),0)||0;acc.charge+=Math.max(Number(line.quantity_issued)-usableReturned,0)*Number(line.contractor_unit_rate_paise);return acc;},{issued:0,returned:0,used:0,unaccounted:0,charge:0}),[lines,reconcile]);
  async function run(name:string,args:Record<string,unknown>){setBusy(true);setError('');setMessage('');const {data,error:e}=await supabase.rpc(name,args);if(e)setError(e.message);else{setMessage(typeof data==='string'?data:'Operation completed successfully.');await load();if(name==='reconcile_contractor_materials')await selectWorkOrder(selectedId)}setBusy(false)}
  async function recordReturn(line:IssueLine){const quantity=Number(returns[line.id]?.quantity||0);const returned=line.material_return_items?.reduce((sum,item)=>sum+Number(item.quantity_returned),0)||0;if(!Number.isFinite(quantity)||quantity<=0||quantity>Number(line.quantity_issued)-returned){setError('Enter a return quantity greater than zero and no more than the remaining issued quantity.');return;}setBusy(true);setError('');setMessage('');const {error:e}=await supabase.rpc('return_contractor_materials',{p_organization_id:organizationId,p_issue_id:line.issue_id,p_items:[{issue_item_id:line.id,quantity_returned:quantity,condition:returns[line.id]?.condition||'usable',notes:returns[line.id]?.notes||null}]});if(e)setError(e.message);else{setMessage('Material return recorded.');await selectWorkOrder(selectedId);await load();}setBusy(false);}
  async function saveReconciliation(){if(!selectedId)return;const rows=lines.map(l=>({issue_item_id:l.id,quantity_used:Number(reconcile[l.id]?.used||0),unaccounted_reason:reconcile[l.id]?.reason||null}));await run('reconcile_contractor_materials',{p_organization_id:organizationId,p_work_order_id:selectedId,p_rows:rows})}
