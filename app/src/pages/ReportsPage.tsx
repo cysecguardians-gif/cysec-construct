@@ -3,100 +3,101 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import './reports.css';
 
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 });
-
-type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
-type Invoice = { id: string; invoice_number: string | null; invoice_date: string; status: string; discount_amount_paise: number; subtotal_paise: number; taxable_value_paise: number; total_gst_paise: number; grand_total_paise: number };
-type Payment = { id: string; invoice_id: string; amount_paise: number; payment_date: string; payment_method: string };
-type Movement = { id: string; material_id: string; movement_type: string; quantity: number; created_at: string; materials?: { name: string }[] | null };
-type CustomerBalance = { customer_id: string; name: string; total_invoiced_paise: number; total_paid_paise: number; total_pending_paise: number };
-
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10); };
-const fyStart = () => { const d = new Date(); const year = d.getFullYear(); const month = d.getMonth() + 1; return `${month >= 4 ? year : year - 1}-04-01`; };
+const fyStart = () => { const d = new Date(); const y = d.getFullYear(); return (d.getMonth() + 1 >= 4 ? y : y - 1) + '-04-01'; };
+const rupees = (v: unknown) => money.format(Number(v || 0) / 100);
+const quantity = (v: unknown) => Number(v || 0).toLocaleString('en-IN', { maximumFractionDigits: 3 });
+
+type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
+type Contract = { contract_id: string; client_company_name: string; contract_number: string; title: string; revised_value_paise: number; total_billed_paise: number; total_received_paise: number; pending_receivable_paise: number; unbilled_contract_value_paise: number };
+type Bill = { bill_id: string; bill_number: string; bill_date: string; amount_claimed_paise: number; received_paise: number; deducted_paise: number; retention_paise: number; pending_receivable_paise: number; status: string };
+type WorkOrder = { work_order_id: string; contractor_name: string; po_number: string; payment_basis: string; agreed_percentage: number | null; agreed_work_amount_paise: number; total_advances_paise: number; settlement_paid_paise: number; settlement_pending_paise: number | null; status: string };
+type Purchase = { id: string; purchase_number: string | null; vendor_invoice_number: string | null; purchase_date: string; total_amount_paise: number; payment_status: string; vendors?: { name: string } | null };
+type Material = { id: string; name: string; current_quantity: number };
 
 export default function ReportsPage({ supabase, organizationId, onBack }: Props) {
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(today());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [movements, setMovements] = useState<Movement[]>([]);
-  const [balances, setBalances] = useState<CustomerBalance[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
 
   async function load() {
     setLoading(true); setError('');
-    const [invoiceResult, paymentResult, movementResult, balanceResult] = await Promise.all([
-      supabase.from('invoices').select('id,invoice_number,invoice_date,status,discount_amount_paise,subtotal_paise,taxable_value_paise,total_gst_paise,grand_total_paise').eq('organization_id', organizationId).gte('invoice_date', from).lte('invoice_date', to).order('invoice_date', { ascending: false }),
-      supabase.from('payments').select('id,invoice_id,amount_paise,payment_date,payment_method').eq('organization_id', organizationId).gte('payment_date', from).lte('payment_date', to).order('payment_date', { ascending: false }),
-      supabase.from('stock_movements').select('id,material_id,movement_type,quantity,created_at,materials(name)').eq('organization_id', organizationId).gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59.999`).order('created_at', { ascending: false }),
-      supabase.from('customer_balance_summary').select('customer_id,name,total_invoiced_paise,total_paid_paise,total_pending_paise').eq('organization_id', organizationId).order('total_pending_paise', { ascending: false }).limit(20),
+    const results = await Promise.all([
+      supabase.from('contract_finance_summary').select('contract_id,client_company_name,contract_number,title,revised_value_paise,total_billed_paise,total_received_paise,pending_receivable_paise,unbilled_contract_value_paise').eq('organization_id', organizationId).order('contract_number'),
+      supabase.from('client_bill_finance_summary').select('bill_id,bill_number,bill_date,amount_claimed_paise,received_paise,deducted_paise,retention_paise,pending_receivable_paise,status').eq('organization_id', organizationId).gte('bill_date', from).lte('bill_date', to).order('bill_date', { ascending: false }),
+      supabase.from('contractor_work_order_summary').select('work_order_id,contractor_name,po_number,payment_basis,agreed_percentage,agreed_work_amount_paise,total_advances_paise,settlement_paid_paise,settlement_pending_paise,status').eq('organization_id', organizationId).order('po_number'),
+      supabase.from('material_purchases').select('id,purchase_number,vendor_invoice_number,purchase_date,total_amount_paise,payment_status,vendors(name)').eq('organization_id', organizationId).gte('purchase_date', from).lte('purchase_date', to).order('purchase_date', { ascending: false }),
+      supabase.from('materials').select('id,name,current_quantity').eq('organization_id', organizationId).eq('is_active', true).order('name')
     ]);
-    if (invoiceResult.error || paymentResult.error || movementResult.error || balanceResult.error) {
-      setError(invoiceResult.error?.message || paymentResult.error?.message || movementResult.error?.message || balanceResult.error?.message || 'Could not load reports.');
-      setLoading(false); return;
-    }
-    setInvoices((invoiceResult.data ?? []) as Invoice[]);
-    setPayments((paymentResult.data ?? []) as Payment[]);
-    setMovements((movementResult.data ?? []) as Movement[]);
-    setBalances((balanceResult.data ?? []) as CustomerBalance[]);
+    const failure = results.find(r => r.error);
+    if (failure?.error) { setError(failure.error.message); setLoading(false); return; }
+    setContracts((results[0].data || []) as Contract[]);
+    setBills((results[1].data || []) as Bill[]);
+    setWorkOrders((results[2].data || []) as WorkOrder[]);
+    setPurchases((results[3].data || []) as unknown as Purchase[]);
+    setMaterials((results[4].data || []) as Material[]);
     setLoading(false);
   }
-
   useEffect(() => { void load(); }, [organizationId, from, to]);
 
-  const issued = useMemo(() => invoices.filter(i => i.status === 'issued'), [invoices]);
-  const cancelled = useMemo(() => invoices.filter(i => i.status === 'cancelled'), [invoices]);
-  const sales = useMemo(() => ({
-    invoices: issued.length,
-    subtotal: issued.reduce((s, i) => s + Number(i.subtotal_paise), 0),
-    discounts: issued.reduce((s, i) => s + Number(i.discount_amount_paise), 0),
-    taxable: issued.reduce((s, i) => s + Number(i.taxable_value_paise), 0),
-    gst: issued.reduce((s, i) => s + Number(i.total_gst_paise), 0),
-    total: issued.reduce((s, i) => s + Number(i.grand_total_paise), 0),
-  }), [issued]);
-  const collected = payments.reduce((s, p) => s + Number(p.amount_paise), 0);
-  const outstanding = balances.reduce((s, b) => s + Number(b.total_pending_paise), 0);
-  const stockIn = movements.filter(m => ['opening', 'purchase', 'adjustment_in', 'return_in'].includes(m.movement_type)).reduce((s, m) => s + Number(m.quantity), 0);
-  const stockOut = movements.filter(m => ['sale', 'adjustment_out', 'return_out'].includes(m.movement_type)).reduce((s, m) => s + Number(m.quantity), 0);
+  const contractTotals = useMemo(() => contracts.reduce((a, c) => ({
+    value: a.value + Number(c.revised_value_paise), billed: a.billed + Number(c.total_billed_paise),
+    received: a.received + Number(c.total_received_paise), pending: a.pending + Number(c.pending_receivable_paise),
+    unbilled: a.unbilled + Number(c.unbilled_contract_value_paise)
+  }), { value: 0, billed: 0, received: 0, pending: 0, unbilled: 0 }), [contracts]);
+  const billTotals = bills.reduce((a, b) => ({
+    claimed: a.claimed + Number(b.amount_claimed_paise), received: a.received + Number(b.received_paise),
+    deductions: a.deductions + Number(b.deducted_paise), retention: a.retention + Number(b.retention_paise),
+    pending: a.pending + Number(b.pending_receivable_paise)
+  }), { claimed: 0, received: 0, deductions: 0, retention: 0, pending: 0 });
+  const workTotals = workOrders.reduce((a, w) => ({
+    agreed: a.agreed + Number(w.agreed_work_amount_paise), advances: a.advances + Number(w.total_advances_paise),
+    paid: a.paid + Number(w.settlement_paid_paise), pending: a.pending + Number(w.settlement_pending_paise || 0)
+  }), { agreed: 0, advances: 0, paid: 0, pending: 0 });
+  const purchaseTotal = purchases.reduce((s, p) => s + Number(p.total_amount_paise), 0);
+  const stockQuantity = materials.reduce((s, m) => s + Number(m.current_quantity), 0);
 
   return <main className="main-content reports-page">
     <button className="back-link" onClick={onBack}>← Back to dashboard</button>
-    <header className="topbar"><div><p className="eyebrow">Reports</p><h1>Business reports</h1></div></header>
+    <header className="topbar"><div><p className="eyebrow">Reports & analytics</p><h1>Construction business reports</h1><p className="page-subtitle">Contract finance, client receivables, procurement, contractor advances and settlements.</p></div></header>
     <section className="report-toolbar">
       <div><span>From</span><input type="date" value={from} max={to} onChange={e => setFrom(e.target.value)} /></div>
       <div><span>To</span><input type="date" value={to} min={from} max={today()} onChange={e => setTo(e.target.value)} /></div>
-      <div className="report-presets"><button onClick={() => { setFrom(today()); setTo(today()); }}>Today</button><button onClick={() => { setFrom(monthStart()); setTo(today()); }}>This month</button><button onClick={() => { setFrom(fyStart()); setTo(today()); }}>Current FY</button></div>
-      <span className="report-status">{loading ? 'Refreshing…' : `${issued.length} issued invoices`}</span>
+      <div className="report-presets"><button onClick={() => { setFrom(today()); setTo(today()); }}>Today</button><button onClick={() => { setFrom(monthStart()); setTo(today()); }}>This month</button><button onClick={() => { setFrom(fyStart()); setTo(today()); }}>Current FY</button><button onClick={() => { setFrom('2000-01-01'); setTo(today()); }}>All history</button></div>
+      <span className="report-status">{loading ? 'Refreshing…' : 'Live database figures'}</span>
     </section>
     {error && <div className="alert error page-alert">{error}</div>}
-
     <section className="report-metrics">
-      <div className="metric"><span>Sales</span><strong>{money.format(sales.total / 100)}</strong><small>{sales.invoices} issued invoices</small></div>
-      <div className="metric"><span>Payments collected</span><strong>{money.format(collected / 100)}</strong><small>{payments.length} payments in period</small></div>
-      <div className="metric"><span>Outstanding receivables</span><strong>{money.format(outstanding / 100)}</strong><small>Across active customer balances</small></div>
-      <div className="metric"><span>GST</span><strong>{money.format(sales.gst / 100)}</strong><small>On issued invoices</small></div>
+      <div className="metric"><span>Revised contract value</span><strong>{rupees(contractTotals.value)}</strong><small>{contracts.length} contracts · all history</small></div>
+      <div className="metric"><span>Client receivables</span><strong>{rupees(contractTotals.pending)}</strong><small>Across all contracts</small></div>
+      <div className="metric"><span>Vendor purchases</span><strong>{rupees(purchaseTotal)}</strong><small>{purchases.length} purchases in period</small></div>
+      <div className="metric"><span>Settlement pending</span><strong>{rupees(workTotals.pending)}</strong><small>{workOrders.length} work orders</small></div>
     </section>
-
     <section className="reports-grid">
-      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Sales</p><h3>Sales summary</h3></div></div><div className="report-lines">
-        <span><b>Subtotal</b><strong>{money.format(sales.subtotal / 100)}</strong></span>
-        <span><b>Discounts</b><strong>{money.format(sales.discounts / 100)}</strong></span>
-        <span><b>Taxable value</b><strong>{money.format(sales.taxable / 100)}</strong></span>
-        <span><b>GST</b><strong>{money.format(sales.gst / 100)}</strong></span>
-        <span className="report-grand"><b>Grand total</b><strong>{money.format(sales.total / 100)}</strong></span>
+      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Project finance · all history</p><h3>Contract portfolio</h3></div></div><div className="report-lines">
+        <span><b>Revised contract value</b><strong>{rupees(contractTotals.value)}</strong></span><span><b>Billed</b><strong>{rupees(contractTotals.billed)}</strong></span><span><b>Receipts</b><strong>{rupees(contractTotals.received)}</strong></span><span><b>Pending receivables</b><strong>{rupees(contractTotals.pending)}</strong></span><span className="report-grand"><b>Unbilled contract value</b><strong>{rupees(contractTotals.unbilled)}</strong></span>
       </div></div>
-      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Stock</p><h3>Movement summary</h3></div></div><div className="report-lines">
-        <span><b>Stock in</b><strong>{stockIn.toLocaleString('en-IN')}</strong></span>
-        <span><b>Stock out</b><strong>{stockOut.toLocaleString('en-IN')}</strong></span>
-        <span><b>Net movement</b><strong>{(stockIn - stockOut).toLocaleString('en-IN')}</strong></span>
-        <span><b>Movement records</b><strong>{movements.length}</strong></span>
-        <span className="report-note">Quantities are combined across units; use the ledger for material-level detail.</span>
+      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Client billing · selected period</p><h3>Bill & receipt summary</h3></div></div><div className="report-lines">
+        <span><b>Amount claimed</b><strong>{rupees(billTotals.claimed)}</strong></span><span><b>Receipts</b><strong>{rupees(billTotals.received)}</strong></span><span><b>Non-retention deductions</b><strong>{rupees(billTotals.deductions - billTotals.retention)}</strong></span><span><b>Retention held</b><strong>{rupees(billTotals.retention)}</strong></span><span className="report-grand"><b>Bill balance</b><strong>{rupees(billTotals.pending)}</strong></span>
+      </div></div>
+      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Procurement · selected period</p><h3>Vendor purchases</h3></div></div><div className="report-lines">
+        <span><b>Purchase value</b><strong>{rupees(purchaseTotal)}</strong></span><span><b>Purchase records</b><strong>{purchases.length}</strong></span><span><b>Unpaid records</b><strong>{purchases.filter(p => p.payment_status === 'unpaid').length}</strong></span><span><b>Partially paid</b><strong>{purchases.filter(p => p.payment_status === 'partially_paid').length}</strong></span>
+      </div></div>
+      <div className="report-card"><div className="section-head"><div><p className="eyebrow">Contractor finance · all history</p><h3>Work order & settlement</h3></div></div><div className="report-lines">
+        <span><b>Agreed work value</b><strong>{rupees(workTotals.agreed)}</strong></span><span><b>Advances issued</b><strong>{rupees(workTotals.advances)}</strong></span><span><b>Settlement payments</b><strong>{rupees(workTotals.paid)}</strong></span><span className="report-grand"><b>Settlement balance</b><strong>{rupees(workTotals.pending)}</strong></span>
       </div></div>
     </section>
-
-    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Receivables</p><h3>Customer balances</h3></div><span>Top 20 by outstanding amount</span></div><table><thead><tr><th>Customer</th><th>Invoiced</th><th>Paid</th><th>Outstanding</th></tr></thead><tbody>{balances.length === 0 ? <tr><td colSpan={4}><div className="table-empty">No customer balances found.</div></td></tr> : balances.map(b => <tr key={b.customer_id}><td><strong>{b.name}</strong></td><td>{money.format(Number(b.total_invoiced_paise) / 100)}</td><td>{money.format(Number(b.total_paid_paise) / 100)}</td><td><strong>{money.format(Number(b.total_pending_paise) / 100)}</strong></td></tr>)}</tbody></table></section>
-
-    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Invoices</p><h3>Period activity</h3></div><span>{cancelled.length} cancelled</span></div><table><thead><tr><th>Invoice</th><th>Date</th><th>Status</th><th>Amount</th></tr></thead><tbody>{invoices.length === 0 ? <tr><td colSpan={4}><div className="table-empty">No invoices in this period.</div></td></tr> : invoices.slice(0, 50).map(i => <tr key={i.id}><td><strong>{i.invoice_number || 'Draft'}</strong></td><td>{new Date(i.invoice_date).toLocaleDateString('en-IN')}</td><td><span className={`pill ${i.status === 'issued' ? 'active' : ''}`}>{i.status.charAt(0).toUpperCase() + i.status.slice(1)}</span></td><td>{money.format(Number(i.grand_total_paise) / 100)}</td></tr>)}</tbody></table></section>
+    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Project finance</p><h3>Contract performance</h3></div><span>Portfolio totals are all-time</span></div><table><thead><tr><th>Contract / client</th><th>Revised value</th><th>Billed</th><th>Received</th><th>Pending</th><th>Unbilled</th></tr></thead><tbody>{contracts.length === 0 ? <tr><td colSpan={6}><div className="table-empty">No contracts found.</div></td></tr> : contracts.map(c => <tr key={c.contract_id}><td><strong>{c.contract_number}</strong><small className="report-subline">{c.title} · {c.client_company_name}</small></td><td>{rupees(c.revised_value_paise)}</td><td>{rupees(c.total_billed_paise)}</td><td>{rupees(c.total_received_paise)}</td><td><strong>{rupees(c.pending_receivable_paise)}</strong></td><td>{rupees(c.unbilled_contract_value_paise)}</td></tr>)}</tbody></table></section>
+    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Client receivables</p><h3>Bill register</h3></div><span>{bills.length} bills in selected period</span></div><table><thead><tr><th>Bill</th><th>Date</th><th>Claimed</th><th>Received</th><th>Deductions</th><th>Retention</th><th>Pending</th><th>Status</th></tr></thead><tbody>{bills.length === 0 ? <tr><td colSpan={8}><div className="table-empty">No client bills in this period.</div></td></tr> : bills.map(b => <tr key={b.bill_id}><td><strong>{b.bill_number}</strong></td><td>{new Date(b.bill_date).toLocaleDateString('en-IN')}</td><td>{rupees(b.amount_claimed_paise)}</td><td>{rupees(b.received_paise)}</td><td>{rupees(b.deducted_paise)}</td><td>{rupees(b.retention_paise)}</td><td><strong>{rupees(b.pending_receivable_paise)}</strong></td><td><span className="pill">{b.status}</span></td></tr>)}</tbody></table></section>
+    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Procurement</p><h3>Purchase register</h3></div><span>{purchases.length} purchases in selected period</span></div><table><thead><tr><th>Purchase</th><th>Vendor invoice</th><th>Vendor</th><th>Date</th><th>Amount</th><th>Payment status</th></tr></thead><tbody>{purchases.length === 0 ? <tr><td colSpan={6}><div className="table-empty">No purchases in this period.</div></td></tr> : purchases.map(p => <tr key={p.id}><td><strong>{p.purchase_number || '—'}</strong></td><td>{p.vendor_invoice_number || '—'}</td><td>{p.vendors?.name || '—'}</td><td>{new Date(p.purchase_date).toLocaleDateString('en-IN')}</td><td>{rupees(p.total_amount_paise)}</td><td>{p.payment_status}</td></tr>)}</tbody></table></section>
+    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Contractor management</p><h3>Work order settlement register</h3></div><span>{workOrders.length} work orders</span></div><table><thead><tr><th>PO number</th><th>Contractor</th><th>Basis</th><th>Agreed work</th><th>Advances</th><th>Paid</th><th>Pending</th><th>Status</th></tr></thead><tbody>{workOrders.length === 0 ? <tr><td colSpan={8}><div className="table-empty">No work orders found.</div></td></tr> : workOrders.map(w => <tr key={w.work_order_id}><td><strong>{w.po_number}</strong></td><td>{w.contractor_name}</td><td>{w.payment_basis === 'percentage' ? String(w.agreed_percentage) + '%' : 'Fixed'}</td><td>{rupees(w.agreed_work_amount_paise)}</td><td>{rupees(w.total_advances_paise)}</td><td>{rupees(w.settlement_paid_paise)}</td><td>{rupees(w.settlement_pending_paise)}</td><td>{w.status}</td></tr>)}</tbody></table></section>
+    <section className="table-card report-table-card"><div className="report-table-head"><div><p className="eyebrow">Materials</p><h3>Current material stock</h3></div><span>{materials.length} active materials · quantities retain their units</span></div><table><thead><tr><th>Material</th><th>Current quantity</th></tr></thead><tbody>{materials.length === 0 ? <tr><td colSpan={2}><div className="table-empty">No active materials found.</div></td></tr> : materials.map(m => <tr key={m.id}><td><strong>{m.name}</strong></td><td>{quantity(m.current_quantity)}</td></tr>)}</tbody></table></section>
   </main>;
 }
