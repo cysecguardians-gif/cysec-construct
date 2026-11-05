@@ -10,12 +10,10 @@ type Props = {
   onReady: () => void;
 };
 
-type AppStatusResponse = {
-  ok?: boolean;
-  authenticated?: boolean;
+type SetupStatusResponse = {
+  initialized?: boolean;
+  admin_exists?: boolean;
   schema_version?: number | null;
-  currency_code?: string;
-  locale?: string;
 };
 
 export default function DatabaseSetupPage({ supabase, error: initialError, onReady }: Props) {
@@ -30,7 +28,10 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
     setError('');
     setMessage('Checking database schema…');
 
-    const { data, error: rpcError } = await supabase.rpc('get_app_status');
+    // Database verification runs before an administrator signs in. Use the
+    // deliberately public, read-only setup RPC rather than get_app_status(),
+    // which requires an authenticated session.
+    const { data, error: rpcError } = await supabase.rpc('get_setup_status');
     if (rpcError) {
       console.error('Database verification RPC failed:', {
         code: rpcError.code,
@@ -40,7 +41,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       });
       setMessage('Database verification RPC failed.');
       if (rpcError.code === 'PGRST202' || rpcError.code === 'PGRST205') {
-        setError('Install the database setup SQL below in this Supabase project, then click Verify database setup.');
+        setError('The database setup check is not installed in this Supabase project. Copy the database setup SQL below, run it in the Supabase SQL Editor, then verify again.');
       } else {
         setError(`Database verification failed: ${rpcError.message}${rpcError.code ? ` (code ${rpcError.code})` : ''}`);
       }
@@ -50,12 +51,18 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
     console.info('Database verification RPC response:', data);
 
-    const appStatus = data as AppStatusResponse | null;
-    const version = Number(appStatus?.schema_version ?? 0);
+    const setupStatus = data as SetupStatusResponse | null;
+    if (!setupStatus || typeof setupStatus !== 'object' || !Number.isFinite(Number(setupStatus.schema_version))) {
+      setSchemaVersion(null);
+      setMessage('Database setup status could not be interpreted.');
+      setError('The setup-status function returned an unexpected response. Check the installed SQL version and try again.');
+      setBusy(false);
+      return;
+    }
+
+    const version = Number(setupStatus.schema_version);
     setSchemaVersion(version);
-    const responseSummary = appStatus
-      ? `RPC succeeded • authenticated=${String(appStatus.authenticated ?? 'unknown')} • schema_version=${String(appStatus.schema_version ?? 'null')}`
-      : 'RPC succeeded, but returned no status object.';
+    const responseSummary = `Setup check succeeded • administrator_exists=${String(setupStatus.admin_exists ?? false)} • schema_version=${version}`;
 
     if (version < 8) {
       setMessage(`${responseSummary}.`);
