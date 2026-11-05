@@ -42,7 +42,7 @@ const required: Record<ImportType,string[]> = {
 const constructionTypes: ImportType[] = ['client_companies','contracts','projects','vendors','contractors','work_orders','advances','client_bills','client_receipts','client_deductions','material_purchases','material_issues','material_returns'];
 
 export default function DataImportPage({supabase,organizationId,onBack}:Props) {
-  const [type,setType]=useState<ImportType>('client_companies');
+  const [type,setType]=useState<ImportType>('customers');
   const [sourceRows,setSourceRows]=useState<SpreadsheetRow[]>([]);
   const [mappedRows,setMappedRows]=useState<Record<string,string>[]>([]);
   const [fileName,setFileName]=useState('');
@@ -50,6 +50,7 @@ export default function DataImportPage({supabase,organizationId,onBack}:Props) {
   const [message,setMessage]=useState('');
   const [busy,setBusy]=useState(false);
   const [isAdmin,setIsAdmin]=useState<boolean|null>(null);
+  const [constructionImportsAvailable,setConstructionImportsAvailable]=useState<boolean|null>(null);
   const inputRef=useRef<HTMLInputElement>(null);
 
   useEffect(()=>{let active=true;(async()=>{
@@ -57,6 +58,10 @@ export default function DataImportPage({supabase,organizationId,onBack}:Props) {
     const {data,error:e}=await supabase.from('organization_members').select('role,is_active').eq('organization_id',organizationId).eq('user_id',user.data.user?.id??'').maybeSingle();
     if(!active)return;
     if(e)setError(e.message);else setIsAdmin(data?.is_active===true&&data?.role==='admin');
+    const probe=await supabase.rpc('import_construction_records',{p_organization_id:organizationId,p_import_type:'client_companies',p_rows:[]});
+    if(!active)return;
+    const missing=probe.error?.code==='PGRST202'||probe.error?.code==='42883'||/could not find the function|function .* does not exist/i.test(probe.error?.message||'');
+    setConstructionImportsAvailable(!missing);
   })();return()=>{active=false}},[supabase,organizationId]);
 
   const validation=useMemo(()=>{
@@ -104,7 +109,8 @@ export default function DataImportPage({supabase,organizationId,onBack}:Props) {
   const columns=Object.keys(aliases[type]);
   return <main className="main-content">
     <header className="topbar"><div><p className="eyebrow">Migration & onboarding</p><h1>Import business data</h1><p className="page-subtitle">Bring existing Excel or CSV records into this business workspace.</p></div><button className="secondary" onClick={onBack}>Back</button></header>
-    <section className="setup-card"><div><h3>Choose data to import</h3><p>Files are read locally. Data is sent to Supabase only when you confirm the import.</p></div><select value={type} onChange={e=>changeType(e.target.value as ImportType)}><optgroup label="Construction management">{constructionTypes.map(k=><option key={k} value={k}>{labels[k]}</option>)}</optgroup><optgroup label="Legacy material / sales">{(['customers','materials','stock','invoices','payments'] as ImportType[]).map(k=><option key={k} value={k}>{labels[k]}</option>)}</optgroup></select></section>
+    <section className="setup-card"><div><h3>Choose data to import</h3><p>Files are read locally. Data is sent to Supabase only when you confirm the import.</p></div><select value={type} onChange={e=>changeType(e.target.value as ImportType)}>{constructionImportsAvailable&&<optgroup label="Construction management">{constructionTypes.map(k=><option key={k} value={k}>{labels[k]}</option>)}</optgroup>}<optgroup label="Legacy material / sales">{(['customers','materials','stock','invoices','payments'] as ImportType[]).map(k=><option key={k} value={k}>{labels[k]}</option>)}</optgroup></select></section>
+    {constructionImportsAvailable===false&&<section className="quick-card import-guidance"><p>Construction-specific imports are temporarily unavailable for this database. The existing schema v16 remains supported; no database migration is required to continue using BuildSphere. We will enable these imports only after the database upgrade has been reviewed and approved.</p></section>}
     {constructionTypes.includes(type)&&<section className="quick-card import-guidance"><div className="section-head"><div><p className="eyebrow">Important</p><h3>Import in dependency order</h3></div></div><p>Import client companies before contracts, contracts before projects, and projects plus contractors before work orders. Import bills before receipts and deductions. Work order advances are imported after work orders. Material purchase rows are grouped by purchase number; issue rows by issue number; return rows by return number. Keep each transaction number consistent across its item rows.</p><p>Amounts in spreadsheets are entered in rupees and converted to paise. Material purchase/issue/return imports call the same transactional stock functions as normal app operations. Existing records are not overwritten; duplicate keys or missing parent records stop the entire batch.</p><p>Contractor settlements are intentionally not imported as raw rows: their material, advance and payable snapshots must be generated by the settlement workflow after source transactions are verified.</p></section>}
     <section className="quick-card import-columns"><div><p className="eyebrow">Spreadsheet format</p><h3>Expected columns for {labels[type]}</h3><p className="hint">Required fields are marked with an asterisk. Header aliases are accepted where available.</p><p className="import-column-list">{columns.map((column,i)=><span key={column}>{column.replaceAll('_',' ')}{required[type].includes(column)?' *':''}{i<columns.length-1?' · ':''}</span>)}</p></div></section>
     <section className="quick-card">
