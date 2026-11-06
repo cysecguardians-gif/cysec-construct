@@ -136,6 +136,54 @@ create table if not exists public.client_bills (
     references public.projects(organization_id, id) on delete restrict
 );
 
+-- Upgrade databases where client_bills predates this construction schema.
+-- The legacy amount_claimed_paise and notes fields carry the same business
+-- values as the current amount_paise and description fields; rename them
+-- instead of creating empty financial columns or losing existing data.
+do $
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_bills'
+      and column_name='amount_claimed_paise'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_bills'
+      and column_name='amount_paise'
+  ) then
+    alter table public.client_bills rename column amount_claimed_paise to amount_paise;
+  elsif exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_bills'
+      and column_name='amount_claimed_paise'
+  ) and exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_bills'
+      and column_name='amount_paise'
+  ) then
+    update public.client_bills
+      set amount_paise = amount_claimed_paise
+      where amount_paise is null;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_bills'
+      and column_name='notes'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_bills'
+      and column_name='description'
+  ) then
+    alter table public.client_bills rename column notes to description;
+  end if;
+end $;
+
+alter table public.client_bills
+  add column if not exists project_id uuid,
+  add column if not exists description text,
+  add column if not exists created_by uuid references public.profiles(id) on delete set null;
+
 create unique index if not exists uq_client_bills_organization_id_id
   on public.client_bills(organization_id, id);
 
