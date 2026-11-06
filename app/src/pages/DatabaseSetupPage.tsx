@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import setupSql from '../generated/customerDatabaseSetup.json';
+import upgradeSql from '../generated/customerDatabaseUpgrade.json';
 
 type Props = {
   supabase: SupabaseClient;
@@ -21,6 +22,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [message, setMessage] = useState('Checking database schema…');
+  const [schemaVersion, setSchemaVersion] = useState<number | null>(null);
 
   async function verify() {
     setBusy(true);
@@ -49,6 +51,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
     const appStatus = data as AppStatusResponse | null;
     const version = Number(appStatus?.schema_version ?? 0);
+    setSchemaVersion(version);
     const responseSummary = appStatus
       ? `RPC succeeded • authenticated=${String(appStatus.authenticated ?? 'unknown')} • schema_version=${String(appStatus.schema_version ?? 'null')}`
       : 'RPC succeeded, but returned no status object.';
@@ -68,7 +71,8 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
   async function copySetupSql() {
     setError('');
     try {
-      await navigator.clipboard.writeText(setupSql);
+      const sqlToCopy = schemaVersion !== null && schemaVersion >= 25 ? upgradeSql : setupSql;
+      await navigator.clipboard.writeText(sqlToCopy);
       setCopied(true);
       setMessage('Database setup SQL copied to the clipboard.');
       window.setTimeout(() => setCopied(false), 2500);
@@ -92,31 +96,40 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
         <div className="auth-copy">
           <p className="eyebrow">Database setup</p>
-          <h1>Prepare your business database</h1>
+          <h1>{schemaVersion !== null && schemaVersion >= 25 ? 'Update your business database' : 'Prepare your business database'}</h1>
           <p>
-            Your Supabase project is connected, but the CySec Construct database schema has not been installed yet.
-            This is a one-time setup for this business.
+            {schemaVersion !== null && schemaVersion >= 25
+              ? `Your existing database is at schema version ${schemaVersion}. Apply the targeted compatibility migration to upgrade it to version 26.`
+              : 'Your Supabase project is connected, but the CySec Construct database schema has not been installed yet. This is a one-time setup for this business.'}
           </p>
         </div>
 
         <div className="stack" style={{ gap: 12 }}>
           <div className="setup-card" style={{ display: 'block', marginBottom: 0 }}>
-            <h3>Install the database schema</h3>
-            <p>
-              The complete production database setup SQL is bundled inside this desktop application. You do not need
-              access to our GitHub repository.
-            </p>
-            <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
-              <li>Click <strong>Copy database setup SQL</strong>.</li>
-              <li>Open the Supabase SQL Editor for this business.</li>
-              <li>Paste the SQL and click <strong>Run</strong>.</li>
-              <li>Return here and click <strong>Verify database setup</strong>.</li>
-            </ol>
+            {schemaVersion !== null && schemaVersion >= 25 ? <>
+              <h3>Apply the v25 → v26 compatibility update</h3>
+              <p>Only migration 0026 is required for this existing database. Do not rerun the complete initial setup script.</p>
+              <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
+                <li>Click <strong>Copy database upgrade SQL</strong>.</li>
+                <li>Open the Supabase SQL Editor for this business.</li>
+                <li>Paste the migration and click <strong>Run</strong>.</li>
+                <li>Return here and click <strong>Verify database setup</strong>.</li>
+              </ol>
+            </> : <>
+              <h3>Install the database schema</h3>
+              <p>The complete production database setup SQL is bundled inside this desktop application. You do not need access to our GitHub repository.</p>
+              <ol style={{ margin: '14px 0 0', paddingLeft: 22, lineHeight: 1.8 }}>
+                <li>Click <strong>Copy database setup SQL</strong>.</li>
+                <li>Open the Supabase SQL Editor for this business.</li>
+                <li>Paste the SQL and click <strong>Run</strong>.</li>
+                <li>Return here and click <strong>Verify database setup</strong>.</li>
+              </ol>
+            </>}
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button className="secondary" type="button" onClick={() => void copySetupSql()}>
-              {copied ? 'SQL copied' : 'Copy database setup SQL'}
+              {copied ? 'SQL copied' : schemaVersion !== null && schemaVersion >= 25 ? 'Copy database upgrade SQL' : 'Copy database setup SQL'}
             </button>
             <a
               href="https://supabase.com/dashboard"
