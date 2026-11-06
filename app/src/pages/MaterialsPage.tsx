@@ -86,7 +86,13 @@ export default function MaterialsPage({ supabase, organizationId, onBack }: Prop
       if (insertError) throw insertError;
       if (quantity > 0 && data) {
         const { error: stockError } = await supabase.rpc('adjust_stock', { p_organization_id: organizationId, p_material_id: data.id, p_quantity: quantity, p_notes: 'Opening stock' });
-        if (stockError) throw stockError;
+        if (stockError) {
+          setShowForm(false);
+          setEditing(null);
+          await load();
+          setError(`Material "${values.name.trim()}" was created, but opening stock was not recorded: ${stockError.message}. Use the Stock action to add the opening quantity.`);
+          return;
+        }
       }
     }
     setShowForm(false);
@@ -159,9 +165,55 @@ function StockAdjustForm({ material, onCancel, onSave }: { material: Material; o
 }
 
 function StockHistoryModal({ supabase, organizationId, material, onClose }: { supabase: SupabaseClient; organizationId: string; material: Material; onClose: () => void }) {
-  const [rows, setRows] = useState<Movement[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-  useEffect(() => { let active = true; (async () => { const { data, error: e } = await supabase.from('stock_movements').select('id,movement_type,quantity,notes,created_at,reference_type,reference_id').eq('organization_id', organizationId).eq('material_id', material.id).order('created_at', { ascending: false }).limit(100); if (!active) return; if (e) setError(e.message); else setRows((data ?? []) as Movement[]); setLoading(false); })(); return () => { active = false; }; }, [supabase, organizationId, material.id]);
-  return <Modal title={`Stock history — ${material.name}`} onClose={onClose}><div className="history-summary"><span>Current stock<strong>{Number(material.current_quantity).toLocaleString('en-IN')} {material.units?.short_code ?? ''}</strong></span><span>Selling value<strong>{money.format(Number(material.current_quantity) * Number(material.selling_price_paise) / 100)}</strong></span></div>{error && <div className="alert error">{error}</div>}{loading ? <div className="table-empty">Loading history…</div> : rows.length === 0 ? <div className="table-empty">No stock movements recorded.</div> : <div className="history-list">{rows.map((row) => <div className="history-row" key={row.id}><div><strong>{movementLabels[row.movement_type] ?? row.movement_type}</strong><small>{new Date(row.created_at).toLocaleString('en-IN')}</small></div><div className={incoming.has(row.movement_type) ? 'history-in' : 'history-out'}>{incoming.has(row.movement_type) ? '+' : '-'}{Number(row.quantity).toLocaleString('en-IN')}</div><div><small>{row.notes || row.reference_type || '—'}</small></div></div>)}</div>}</Modal>;
+  const pageSize = 100;
+  const [rows, setRows] = useState<Movement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true); setError('');
+      const { data, error: e } = await supabase.from('stock_movements')
+        .select('id,movement_type,quantity,notes,created_at,reference_type,reference_id')
+        .eq('organization_id', organizationId).eq('material_id', material.id)
+        .order('created_at', { ascending: false }).order('id', { ascending: false })
+        .range(0, pageSize - 1);
+      if (!active) return;
+      if (e) setError(e.message);
+      else { const page = (data ?? []) as Movement[]; setRows(page); setHasMore(page.length === pageSize); }
+      setLoading(false);
+    })();
+    return () => { active = false; };
+  }, [supabase, organizationId, material.id]);
+  async function loadMore() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true); setError('');
+    try {
+      const { data, error: e } = await supabase.from('stock_movements')
+        .select('id,movement_type,quantity,notes,created_at,reference_type,reference_id')
+        .eq('organization_id', organizationId).eq('material_id', material.id)
+        .order('created_at', { ascending: false }).order('id', { ascending: false })
+        .range(rows.length, rows.length + pageSize - 1);
+      if (e) throw e;
+      const page = (data ?? []) as Movement[];
+      setRows(current => [...current, ...page]);
+      setHasMore(page.length === pageSize);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load more stock history.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+  return <Modal title={`Stock history — ${material.name}`} onClose={onClose}>
+    <div className="history-summary"><span>Current stock<strong>{Number(material.current_quantity).toLocaleString('en-IN')} {material.units?.short_code ?? ''}</strong></span><span>Selling value<strong>{money.format(Number(material.current_quantity) * Number(material.selling_price_paise) / 100)}</strong></span></div>
+    {error && <div className="alert error">{error}</div>}
+    {loading ? <div className="table-empty">Loading history…</div> : rows.length === 0 ? <div className="table-empty">No stock movements recorded.</div> : <>
+      <div className="history-list">{rows.map((row) => <div className="history-row" key={row.id}><div><strong>{movementLabels[row.movement_type] ?? row.movement_type}</strong><small>{new Date(row.created_at).toLocaleString('en-IN')}</small></div><div className={incoming.has(row.movement_type) ? 'history-in' : 'history-out'}>{incoming.has(row.movement_type) ? '+' : '-'}{Number(row.quantity).toLocaleString('en-IN')}</div><div><small>{row.notes || row.reference_type || '—'}</small></div></div>)}</div>
+      <div className="section-head"><small className="muted">Showing {rows.length} movements</small>{hasMore && <button className="secondary compact" onClick={() => void loadMore()} disabled={loadingMore}>{loadingMore ? 'Loading…' : 'Load more'}</button>}</div>
+    </>}
+  </Modal>;
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {

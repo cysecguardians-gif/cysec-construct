@@ -43,9 +43,30 @@ export default function DataImportPage({ supabase, organizationId, onBack }: Pro
     const required = requiredFields(type);
     const errors: string[] = [];
     mappedRows.forEach((row, i) => required.forEach(field => { if (!row[field]?.trim()) errors.push(`Row ${i + 2}: ${field.replaceAll('_',' ')} is required.`); }));
-    if (type === 'stock') mappedRows.forEach((r,i) => { if (r.quantity && Number(r.quantity) <= 0) errors.push(`Row ${i+2}: quantity must be greater than 0.`); });
-    if (type === 'materials') mappedRows.forEach((r,i) => { if (r.gst_rate && (Number(r.gst_rate) < 0 || Number(r.gst_rate) > 100)) errors.push(`Row ${i+2}: GST rate must be between 0 and 100.`); });
-    if (type === 'payments') mappedRows.forEach((r,i) => { if (r.amount && Number(r.amount) <= 0) errors.push(`Row ${i+2}: payment amount must be greater than 0.`); });
+    const checkNumber = (value: string, field: string, row: number, options: { min?: number; max?: number; exclusiveMin?: boolean } = {}) => {
+      if (!value.trim()) return;
+      const n = Number(value);
+      if (!Number.isFinite(n) || (options.exclusiveMin ? n <= (options.min ?? 0) : n < (options.min ?? 0)) || (options.max !== undefined && n > options.max)) {
+        const range = options.max === undefined ? (options.exclusiveMin ? 'greater than' : 'at least') + ` ${options.min ?? 0}` : `between ${options.min ?? 0} and ${options.max}`;
+        errors.push(`Row ${row}: ${field.replaceAll('_', ' ')} must be a valid number ${range}.`);
+      }
+    };
+    mappedRows.forEach((r, i) => {
+      const row = i + 2;
+      if (type === 'stock') checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
+      if (type === 'materials') {
+        checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
+        checkNumber(r.selling_price, 'selling_price', row, { min: 0 });
+        checkNumber(r.quantity, 'quantity', row, { min: 0 });
+        if (r.quantity.trim() && Number(r.quantity) > 0) errors.push(`Row ${row}: import materials with quantity 0 or blank, then import opening balances through Stock Ledger so every stock balance has a matching movement record.`);
+      }
+      if (type === 'invoices') {
+        checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
+        checkNumber(r.unit_price, 'unit_price', row, { min: 0 });
+        checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
+      }
+      if (type === 'payments') checkNumber(r.amount, 'amount', row, { min: 0, exclusiveMin: true });
+    });
     return [...new Set(errors)];
   }, [mappedRows, type]);
 
@@ -60,12 +81,25 @@ export default function DataImportPage({ supabase, organizationId, onBack }: Pro
   function changeType(next: ImportType) { setType(next); if (sourceRows.length) setMappedRows(buildRows(next, sourceRows) as Record<string,string>[]); setError(''); setMessage(''); }
 
   async function importRows() {
-    if (!mappedRows.length || validation.length) return;
+    if (!mappedRows.length || validation.length || busy || isAdmin !== true) return;
     setBusy(true); setError(''); setMessage('Importing…');
     const rpc = type === 'customers' ? 'import_customers' : type === 'materials' ? 'import_materials' : type === 'stock' ? 'import_stock_movements' : type === 'invoices' ? 'import_historical_invoices' : 'import_historical_payments';
-    const { data, error: e } = await supabase.rpc(rpc, { p_organization_id: organizationId, p_rows: mappedRows });
-    if (e) setError(e.message); else setMessage(`Import complete: ${JSON.stringify(data)}. The import was written atomically.`);
-    setBusy(false);
+    try {
+      const { data, error: e } = await supabase.rpc(rpc, { p_organization_id: organizationId, p_rows: mappedRows });
+      if (e) {
+        setError(e.message);
+        setMessage('Import failed. No rows from this database function call were committed; review the error and correct the source before retrying.');
+      } else {
+        setMessage(`Import complete: ${JSON.stringify(data)}. The database function committed the import as one transaction.`);
+        setSourceRows([]); setMappedRows([]); setFileName('');
+        if (inputRef.current) inputRef.current.value = '';
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The import could not be completed.');
+      setMessage('Import failed. Your preview is preserved so you can review it before retrying.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (isAdmin === false) return <main className="main-content"><header className="topbar"><div><p className="eyebrow">Data Import</p><h1>Admin access required</h1></div></header><section className="setup-card"><div><h3>Historical data import is restricted</h3><p>Only an Admin can import customer, material, stock, invoice or payment history.</p></div><button className="secondary" onClick={onBack}>Back</button></section></main>;
@@ -83,7 +117,7 @@ export default function DataImportPage({ supabase, organizationId, onBack }: Pro
     {mappedRows.length > 0 && <section className="recent-card"><div className="section-head"><div><p className="eyebrow">Step 2</p><h3>Review and validate</h3></div><span className={validation.length ? 'status-badge danger' : 'status-badge'}>{validation.length ? `${validation.length} validation issue${validation.length===1?'':'s'}` : `${mappedRows.length} rows ready`}</span></div>
       {validation.length > 0 && <div className="alert error">{validation.slice(0,8).map((v,i)=><div key={i}>{v}</div>)}{validation.length > 8 && <div>…and {validation.length-8} more.</div>}</div>}
       <div className="table-wrap"><table><thead><tr><th>Row</th>{previewColumns.map(c => <th key={c}>{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{mappedRows.slice(0,10).map((r,i)=><tr key={i}><td>{i+2}</td>{previewColumns.map(c=><td key={c}>{r[c] || '—'}</td>)}</tr>)}</tbody></table></div>
-      <div className="section-head import-footer"><p className="hint">Showing the first 10 rows. Imports are all-or-nothing.</p><button className="primary" disabled={busy || validation.length > 0} onClick={() => void importRows()}>{busy ? 'Importing…' : `Import ${mappedRows.length} rows`}</button></div>
+      <div className="section-head import-footer"><p className="hint">Showing the first 10 rows. Imports are all-or-nothing.{type === 'payments' ? ' An identical payment import batch cannot be imported twice.' : type === 'invoices' ? ' Invoice unit prices are rounded to paise before line totals are calculated.' : ''}</p><button className="primary" disabled={busy || validation.length > 0} onClick={() => void importRows()}>{busy ? 'Importing…' : `Import ${mappedRows.length} rows`}</button></div>
     </section>}
   </main>;
 }
