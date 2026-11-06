@@ -31,6 +31,7 @@ const migrationFiles = [
   '0021_contractor_advance_settlement_locking.sql',
   '0022_contractor_recovery_completion_gate.sql',
   '0023_financial_reference_update_guard.sql',
+  '0024_recovery_after_payable_paid.sql',
 ];
 
 const sections = [];
