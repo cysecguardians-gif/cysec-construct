@@ -4,6 +4,12 @@
 
 begin;
 
+-- Repair older customer databases where migration 13 was recorded but its
+-- tenant-scoped settlement index is missing. Migration 19 needs this exact
+-- key for the composite foreign key on contractor_recovery_payments.
+create unique index if not exists uq_contractor_settlements_organization_id_id
+  on public.contractor_settlements(organization_id, id);
+
 alter table public.contractor_settlements
   add column if not exists recovery_status text not null default 'not_due'
   check (recovery_status in ('not_due','outstanding','partially_recovered','recovered'));
