@@ -32,6 +32,7 @@ const migrationFiles = [
   '0022_contractor_recovery_completion_gate.sql',
   '0023_financial_reference_update_guard.sql',
   '0024_recovery_after_payable_paid.sql',
+  '0025_zero_payable_recovery_closure.sql',
 ];
 
 const sections = [];
