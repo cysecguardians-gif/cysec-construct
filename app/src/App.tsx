@@ -75,7 +75,7 @@ function DashboardPage({config,session,supabase,organizationId,onOrganizationFou
 function AppShell({children,active,onNavigate,onSignOut,onChangeConnection}:{children:React.ReactNode;active:string;onNavigate:(s:Screen)=>void;onSignOut:()=>Promise<void>;onChangeConnection:()=>void}){
  const groups=[
   {id:'projects',title:'Project Management',items:[{label:'Projects & Contracts',screen:'construction-contracts' as Screen},{label:'Customers',screen:'customers' as Screen},{label:'Invoices',screen:'invoices' as Screen},{label:'Payments',screen:'payments' as Screen}]},
-  {id:'materials',title:'CySec Construct',items:[{label:'Material Catalogue',screen:'materials' as Screen},{label:'Vendor Purchases',screen:'construction-materials' as Screen},{label:'Stock Ledger',screen:'stock-ledger' as Screen}]},
+  {id:'materials',title:'Material Management',items:[{label:'Material Catalogue',screen:'materials' as Screen},{label:'Vendor Purchases',screen:'construction-materials' as Screen},{label:'Stock Ledger',screen:'stock-ledger' as Screen}]},
   {id:'contractors',title:'Contractor Management',items:[{label:'Contractors & Work Orders',screen:'contractor-management' as Screen},{label:'Advances & Settlement',screen:'contractor-closure' as Screen}]},
  ];
  const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.items.some(item=>item.screen===active)])));
