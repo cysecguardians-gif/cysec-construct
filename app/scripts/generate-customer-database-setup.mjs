@@ -33,6 +33,7 @@ const migrationFiles = [
   '0023_financial_reference_update_guard.sql',
   '0024_recovery_after_payable_paid.sql',
   '0025_zero_payable_recovery_closure.sql',
+  '0026_material_purchase_status_compatibility.sql',
 ];
 
 const sections = [];
