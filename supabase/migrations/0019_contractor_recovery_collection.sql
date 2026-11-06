@@ -46,8 +46,8 @@ create policy contractor_recovery_payments_member_select
   on public.contractor_recovery_payments
   for select to authenticated
   using (public.is_org_member(organization_id));
-grant select on public.contractor_recovery_payments to authenticated;
 revoke all on public.contractor_recovery_payments from anon, authenticated;
+grant select on public.contractor_recovery_payments to authenticated;
 
 
 create or replace function public.approve_contractor_settlement(
