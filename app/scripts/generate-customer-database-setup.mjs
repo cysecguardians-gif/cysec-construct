@@ -26,6 +26,7 @@ const migrationFiles = [
   '0016_stock_import_and_zero_settlement.sql',
   '0017_historical_payment_import_idempotency.sql',
   '0018_historical_invoice_rounding_validation.sql',
+  '0019_contractor_recovery_collection.sql',
 ];
 
 const sections = [];
