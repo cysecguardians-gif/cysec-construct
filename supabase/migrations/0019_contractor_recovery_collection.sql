@@ -34,6 +34,12 @@ create table if not exists public.contractor_recovery_payments (
 create index if not exists idx_contractor_recovery_payments_settlement
   on public.contractor_recovery_payments(organization_id, settlement_id, recovery_date desc);
 
+-- A bank/UPI reference identifies one incoming transaction within a tenant.
+-- Keep it optional for cash receipts, but reject duplicate non-empty references.
+create unique index if not exists uq_contractor_recovery_reference
+  on public.contractor_recovery_payments(organization_id, lower(reference_number))
+  where reference_number is not null and btrim(reference_number) <> '';
+
 alter table public.contractor_recovery_payments enable row level security;
 drop policy if exists contractor_recovery_payments_member_select on public.contractor_recovery_payments;
 create policy contractor_recovery_payments_member_select
