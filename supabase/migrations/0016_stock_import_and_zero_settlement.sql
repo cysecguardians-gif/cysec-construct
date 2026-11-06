@@ -27,8 +27,11 @@ begin
   if not public.is_org_admin(p_organization_id) then
     raise exception 'administrator_required';
   end if;
-  if jsonb_typeof(p_rows) <> 'array' then
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then
     raise exception 'rows_must_be_array';
+  end if;
+  if jsonb_array_length(p_rows) = 0 then
+    raise exception 'stock_import_rows_required';
   end if;
 
   -- Lock every referenced material in a deterministic order before applying
