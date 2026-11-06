@@ -1,123 +1,59 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { readSpreadsheet, type SpreadsheetRow } from '../lib/spreadsheet';
+import { readSpreadsheet, type SpreadsheetData, type SpreadsheetRow } from '../lib/spreadsheet';
 
-type ImportType = 'customers' | 'materials' | 'stock' | 'invoices' | 'payments';
+type ImportType = 'contractors' | 'materials' | 'stock' | 'customers' | 'invoices' | 'payments';
 type Props = { supabase: SupabaseClient; organizationId: string; onBack: () => void };
-
-const labels: Record<ImportType, string> = { customers: 'Customers', materials: 'Materials', stock: 'Stock Ledger', invoices: 'Historical Invoices', payments: 'Historical Payments' };
-const aliases: Record<ImportType, Record<string, string[]>> = {
-  customers: { name: ['customer','customer name','name','client'], gstin: ['gstin','gst no','gst number'], pan: ['pan'], phone: ['phone','mobile','mobile number','contact'], email: ['email','email address'], billing_address_line1: ['address','billing address','address line 1'], billing_city: ['city','billing city'], billing_state: ['state','billing state'], billing_state_code: ['state code','billing state code'], billing_postal_code: ['pin','pincode','postal code','zip'], shipping_address_line1: ['shipping address','shipping address line 1'], shipping_city: ['shipping city'], shipping_state: ['shipping state'], shipping_state_code: ['shipping state code'], shipping_postal_code: ['shipping pin','shipping pincode','shipping postal code'] },
-  materials: { name: ['material','material name','name','item'], unit: ['unit','uom','unit name'], category: ['category','material category'], hsn_sac_code: ['hsn','hsn/sac','hsn sac','sac'], gst_rate: ['gst','gst %','gst rate','tax'], selling_price: ['price','selling price','rate','unit price'], quantity: ['quantity','qty','opening stock','stock'] },
-  stock: { material: ['material','material name','item'], movement_type: ['type','movement type','transaction type'], quantity: ['quantity','qty'], movement_date: ['date','movement date','transaction date'], notes: ['notes','remarks','description'] },
-  invoices: { invoice_number: ['invoice number','invoice no','invoice #','bill no','bill number'], invoice_date: ['invoice date','date'], customer: ['customer','customer name','client'], material: ['material','material name','item'], quantity: ['quantity','qty'], unit_price: ['unit price','price','rate'], gst_rate: ['gst','gst %','gst rate','tax'] },
-  payments: { invoice_number: ['invoice number','invoice no','invoice #','bill no'], amount: ['amount','payment','paid amount'], payment_date: ['payment date','date'], payment_method: ['payment method','method','mode'], reference_number: ['reference','reference number','transaction id','utr'], notes: ['notes','remarks'] },
+type Field = { key: string; label: string; required?: boolean };
+const labels: Record<ImportType,string> = { contractors:'Contractors', materials:'Materials', stock:'Stock Ledger', customers:'Customers', invoices:'Historical Invoices', payments:'Historical Payments' };
+const fields: Record<ImportType,Field[]> = {
+ contractors:[{key:'name',label:'Contractor name',required:true},{key:'contractor_type',label:'Contractor type'},{key:'gstin',label:'GSTIN'},{key:'pan',label:'PAN'},{key:'contact_person',label:'Contact person'},{key:'phone',label:'Phone'},{key:'email',label:'Email'},{key:'address',label:'Address'},{key:'state',label:'State'},{key:'state_code',label:'State code'},{key:'notes',label:'Notes'}],
+ materials:[{key:'name',label:'Material name',required:true},{key:'unit',label:'Unit'},{key:'category',label:'Category'},{key:'hsn_sac_code',label:'HSN/SAC'},{key:'gst_rate',label:'GST rate (%)'},{key:'selling_price',label:'Selling price (₹)'},{key:'quantity',label:'Opening quantity (use Stock Ledger for balances)'}],
+ stock:[{key:'material',label:'Material name',required:true},{key:'movement_type',label:'Movement type',required:true},{key:'quantity',label:'Quantity',required:true},{key:'movement_date',label:'Movement date'},{key:'notes',label:'Notes'}],
+ customers:[{key:'name',label:'Customer name',required:true},{key:'gstin',label:'GSTIN'},{key:'pan',label:'PAN'},{key:'phone',label:'Phone'},{key:'email',label:'Email'},{key:'billing_address_line1',label:'Billing address'},{key:'billing_city',label:'City'},{key:'billing_state',label:'State'},{key:'billing_state_code',label:'State code'},{key:'billing_postal_code',label:'PIN'}],
+ invoices:[{key:'invoice_number',label:'Invoice number',required:true},{key:'invoice_date',label:'Invoice date'},{key:'customer',label:'Customer',required:true},{key:'material',label:'Material',required:true},{key:'quantity',label:'Quantity',required:true},{key:'unit_price',label:'Unit price (₹)'},{key:'gst_rate',label:'GST rate (%)'}],
+ payments:[{key:'invoice_number',label:'Invoice number',required:true},{key:'amount',label:'Amount (₹)',required:true},{key:'payment_date',label:'Payment date'},{key:'payment_method',label:'Payment method'},{key:'reference_number',label:'Reference number'},{key:'notes',label:'Notes'}]
 };
-
-function normalize(s: string) { return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' '); }
-function valueFor(row: SpreadsheetRow, names: string[]) { const entries = Object.entries(row); const wanted = names.map(normalize); const hit = entries.find(([k]) => wanted.includes(normalize(k))); return hit?.[1]?.trim() ?? ''; }
-function buildRows(type: ImportType, source: SpreadsheetRow[]) {
-  const map = aliases[type];
-  return source.map(row => Object.fromEntries(Object.entries(map).map(([field, names]) => [field, valueFor(row, names)])));
-}
-function requiredFields(type: ImportType) { return type === 'customers' ? ['name'] : type === 'materials' ? ['name'] : type === 'stock' ? ['material','movement_type','quantity'] : type === 'invoices' ? ['invoice_number','customer','material','quantity'] : ['invoice_number','amount']; }
-
-export default function DataImportPage({ supabase, organizationId, onBack }: Props) {
-  const [type, setType] = useState<ImportType>('customers');
-  const [sourceRows, setSourceRows] = useState<SpreadsheetRow[]>([]);
-  const [mappedRows, setMappedRows] = useState<Record<string,string>[]>([]);
-  const [fileName, setFileName] = useState('');
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => { let active = true; (async () => {
-    const { data, error: e } = await supabase.from('organization_members').select('role,is_active').eq('organization_id', organizationId).eq('user_id', (await supabase.auth.getUser()).data.user?.id ?? '').maybeSingle();
-    if (!active) return;
-    if (e) setError(e.message); else setIsAdmin(data?.is_active === true && data?.role === 'admin');
-  })(); return () => { active = false; }; }, [supabase, organizationId]);
-
-  const validation = useMemo(() => {
-    const required = requiredFields(type);
-    const errors: string[] = [];
-    mappedRows.forEach((row, i) => required.forEach(field => { if (!row[field]?.trim()) errors.push(`Row ${i + 2}: ${field.replaceAll('_',' ')} is required.`); }));
-    const checkNumber = (value: string, field: string, row: number, options: { min?: number; max?: number; exclusiveMin?: boolean } = {}) => {
-      if (!value.trim()) return;
-      const n = Number(value);
-      if (!Number.isFinite(n) || (options.exclusiveMin ? n <= (options.min ?? 0) : n < (options.min ?? 0)) || (options.max !== undefined && n > options.max)) {
-        const range = options.max === undefined ? (options.exclusiveMin ? 'greater than' : 'at least') + ` ${options.min ?? 0}` : `between ${options.min ?? 0} and ${options.max}`;
-        errors.push(`Row ${row}: ${field.replaceAll('_', ' ')} must be a valid number ${range}.`);
-      }
-    };
-    mappedRows.forEach((r, i) => {
-      const row = i + 2;
-      if (type === 'stock') checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
-      if (type === 'materials') {
-        checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
-        checkNumber(r.selling_price, 'selling_price', row, { min: 0 });
-        checkNumber(r.quantity, 'quantity', row, { min: 0 });
-        if (r.quantity.trim() && Number(r.quantity) > 0) errors.push(`Row ${row}: import materials with quantity 0 or blank, then import opening balances through Stock Ledger so every stock balance has a matching movement record.`);
-      }
-      if (type === 'invoices') {
-        checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
-        checkNumber(r.unit_price, 'unit_price', row, { min: 0 });
-        checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
-      }
-      if (type === 'payments') checkNumber(r.amount, 'amount', row, { min: 0, exclusiveMin: true });
-    });
-    return [...new Set(errors)];
-  }, [mappedRows, type]);
-
-  async function handleFile(file?: File) {
-    if (!file) return;
-    setBusy(true); setError(''); setMessage('Reading spreadsheet locally…');
-    try { const rows = await readSpreadsheet(file); if (!rows.length) throw new Error('The spreadsheet contains no data rows.'); setSourceRows(rows); setMappedRows(buildRows(type, rows) as Record<string,string>[]); setFileName(file.name); setMessage(`${rows.length} data rows loaded. Review the preview before importing.`); }
-    catch (e) { setSourceRows([]); setMappedRows([]); setFileName(''); setError(e instanceof Error ? e.message : 'Could not read the spreadsheet.'); setMessage(''); }
-    finally { setBusy(false); }
+const aliases: Record<string,string[]> = {
+ name:['name','contractor','contractor name','material','material name','item','item description','description of item','customer','customer name','supplier','party name'],
+ contractor_type:['type','contractor type'], gstin:['gstin','gst no','gst number'], pan:['pan'], contact_person:['contact person','contact'], phone:['phone','mobile','mobile number'], email:['email','email address'], address:['address','address line 1'], state:['state'], state_code:['state code'], notes:['notes','remarks','comments'],
+ unit:['unit','uom','unit name'], category:['category','material category'], hsn_sac_code:['hsn','hsn/sac','hsn sac','sac'], gst_rate:['gst','gst %','gst rate','tax'], selling_price:['price','selling price','rate','unit price'], quantity:['quantity','qty','total qty','total quantity','opening stock','stock'], material:['material','material name','item','item description','description of item'], movement_type:['type','movement type','transaction type'], movement_date:['date','movement date','transaction date','challan date'], invoice_number:['invoice number','invoice no','invoice #','bill no','bill number'], invoice_date:['invoice date','date'], customer:['customer','customer name','client'], unit_price:['unit price','price','rate'], amount:['amount','payment','paid amount'], payment_date:['payment date','date'], payment_method:['payment method','method','mode'], reference_number:['reference','reference number','transaction id','utr'], billing_address_line1:['address','billing address','address line 1'], billing_city:['city','billing city'], billing_state:['state','billing state'], billing_state_code:['state code','billing state code'], billing_postal_code:['pin','pincode','postal code','zip']
+};
+const normalize=(s:string)=>s.trim().toLowerCase().replace(/[^a-z0-9]+/g,' ');
+function guess(header:string,type:ImportType){const h=normalize(header);return fields[type].find(f=>[f.key,...(aliases[f.key]??[])].some(a=>normalize(a)===h))?.key??'';}
+function mappedRows(rows:SpreadsheetRow[],mapping:Record<string,string>){return rows.map(row=>{const out:Record<string,string>={};for(const [header,value] of Object.entries(row)){const key=mapping[header];if(key)out[key]=value??'';}return out;});}
+export default function DataImportPage({supabase,organizationId,onBack}:Props){
+ const [type,setType]=useState<ImportType>('contractors');
+ const [book,setBook]=useState<SpreadsheetData|null>(null),[sheet,setSheet]=useState('');
+ const [mapping,setMapping]=useState<Record<string,string>>({});
+ const [fileName,setFileName]=useState(''),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[isAdmin,setIsAdmin]=useState<boolean|null>(null);
+ const inputRef=useRef<HTMLInputElement>(null);
+ const sourceRows=book?.worksheets.find(x=>x.name===sheet)?.rows??[];
+ const preview=mappedRows(sourceRows,mapping);
+ useEffect(()=>{let active=true;(async()=>{const user=await supabase.auth.getUser();const {data,error:e}=await supabase.from('organization_members').select('role,is_active').eq('organization_id',organizationId).eq('user_id',user.data.user?.id??'').maybeSingle();if(!active)return;if(e)setError(e.message);else setIsAdmin(data?.is_active===true&&data?.role==='admin')})();return()=>{active=false}},[supabase,organizationId]);
+ async function handleFile(file?:File){if(!file)return;setBusy(true);setError('');setMessage('Reading workbook…');try{const data=await readSpreadsheet(file);if(!data.worksheets.length)throw new Error('No worksheets found in this workbook.');setBook(data);setSheet(data.worksheets[0].name);setFileName(file.name);const next:Record<string,string>={};for(const h of data.worksheets[0].headers)next[h]=guess(h,type);setMapping(next);setMessage(`${data.worksheets.length} worksheet(s) found. Select a worksheet and map its columns.`)}catch(e){setBook(null);setSheet('');setFileName('');setError(e instanceof Error?e.message:'Could not read the workbook.');setMessage('')}finally{setBusy(false)}}
+ function changeType(next:ImportType){setType(next);const headers=book?.worksheets.find(x=>x.name===sheet)?.headers??[];const nextMap:Record<string,string>={};headers.forEach(h=>nextMap[h]=guess(h,next));setMapping(nextMap);setError('');setMessage('')}
+ function changeSheet(next:string){setSheet(next);const headers=book?.worksheets.find(x=>x.name===next)?.headers??[];const nextMap:Record<string,string>={};headers.forEach(h=>nextMap[h]=guess(h,type));setMapping(nextMap);setError('');setMessage('')}
+ const validation=useMemo(()=>{const issues:string[]=[];const required=fields[type].filter(f=>f.required).map(f=>f.key);if(!preview.length)return issues;required.forEach(key=>{if(!Object.values(mapping).includes(key))issues.push(`Map an Excel column to ${fields[type].find(f=>f.key===key)?.label??key}.`)});preview.forEach((r,i)=>required.forEach(k=>{if(!r[k]?.trim())issues.push(`Row ${i+2}: ${fields[type].find(f=>f.key===k)?.label??k} is required.`)}));preview.forEach((r,i)=>{const row=i+2;for(const k of ['quantity','gst_rate','selling_price','unit_price','amount'])if(r[k]?.trim()&&!Number.isFinite(Number(r[k])))issues.push(`Row ${row}: ${k.replaceAll('_',' ')} must be numeric.`);if(type==='materials'&&Number(r.quantity)>0)issues.push(`Row ${row}: use Stock Ledger for opening quantities; material imports must not create stock without a movement record.`)});return [...new Set(issues)]},[preview,type,mapping]);
+ async function importRows(){if(!preview.length||validation.length||busy||isAdmin!==true)return;setBusy(true);setError('');setMessage('Importing…');try{
+  if(type==='contractors'){
+   const rows=preview.filter(r=>r.name?.trim()).map(r=>({organization_id:organizationId,name:r.name.trim(),contractor_type:['contractor','subcontractor','individual'].includes((r.contractor_type||'').toLowerCase())?(r.contractor_type||'').toLowerCase():'contractor',gstin:r.gstin||null,pan:r.pan||null,contact_person:r.contact_person||null,phone:r.phone||null,email:r.email||null,address:r.address||null,state:r.state||null,state_code:r.state_code||null,notes:r.notes||null,is_active:true}));
+   const {error:e}=await supabase.from('contractors').upsert(rows,{onConflict:'organization_id,name',ignoreDuplicates:true});if(e)throw e;setMessage(`Import complete: ${rows.length} contractor row(s) processed. Existing names were not duplicated.`);
+  }else{
+   const rpc=type==='materials'?'import_materials':type==='stock'?'import_stock_movements':type==='customers'?'import_customers':type==='invoices'?'import_historical_invoices':'import_historical_payments';
+   const payload=preview.map(r=>{const out={...r};if(type==='materials'&&out.selling_price)out.selling_price=String(Number(out.selling_price));return out});
+   const {data,error:e}=await supabase.rpc(rpc,{p_organization_id:organizationId,p_rows:payload});if(e)throw e;setMessage(`Import complete: ${JSON.stringify(data)}`);
   }
-
-  function changeType(next: ImportType) { setType(next); if (sourceRows.length) setMappedRows(buildRows(next, sourceRows) as Record<string,string>[]); setError(''); setMessage(''); }
-
-  async function importRows() {
-    if (!mappedRows.length || validation.length || busy || isAdmin !== true) return;
-    setBusy(true); setError(''); setMessage('Importing…');
-    const rpc = type === 'customers' ? 'import_customers' : type === 'materials' ? 'import_materials' : type === 'stock' ? 'import_stock_movements' : type === 'invoices' ? 'import_historical_invoices' : 'import_historical_payments';
-    try {
-      const { data, error: e } = await supabase.rpc(rpc, { p_organization_id: organizationId, p_rows: mappedRows });
-      if (e) {
-        setError(e.message);
-        setMessage('Import failed. No rows from this database function call were committed; review the error and correct the source before retrying.');
-      } else {
-        setMessage(`Import complete: ${JSON.stringify(data)}. The database function committed the import as one transaction.`);
-        setSourceRows([]); setMappedRows([]); setFileName('');
-        if (inputRef.current) inputRef.current.value = '';
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'The import could not be completed.');
-      setMessage('Import failed. Your preview is preserved so you can review it before retrying.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (isAdmin === false) return <main className="main-content"><header className="topbar"><div><p className="eyebrow">Data Import</p><h1>Admin access required</h1></div></header><section className="setup-card"><div><h3>Historical data import is restricted</h3><p>Only an Admin can import customer, material, stock, invoice or payment history.</p></div><button className="secondary" onClick={onBack}>Back</button></section></main>;
-  if (isAdmin === null) return <main className="main-content"><div className="mini-empty">Checking access…</div></main>;
-
-  const previewColumns = Object.keys(aliases[type]);
-  return <main className="main-content">
-    <header className="topbar"><div><p className="eyebrow">Migration</p><h1>Import business data</h1><p className="page-subtitle">Bring existing Excel or CSV records into this business workspace.</p></div><button className="secondary" onClick={onBack}>Back</button></header>
-    <section className="setup-card"><div><h3>Choose data to import</h3><p>Files are read locally by the desktop application. Nothing is uploaded until you confirm the import.</p></div><select value={type} onChange={e => changeType(e.target.value as ImportType)}>{Object.entries(labels).map(([k,v]) => <option key={k} value={k}>{v}</option>)}</select></section>
-    <section className="quick-card">
-      <div className="section-head"><div><p className="eyebrow">Step 1</p><h3>Upload Excel or CSV</h3></div><button className="primary compact" disabled={busy} onClick={() => inputRef.current?.click()}>Choose file</button><input ref={inputRef} hidden type="file" accept=".xlsx,.csv" onChange={e => void handleFile(e.target.files?.[0])}/></div>
-      {fileName && <p className="hint">{fileName} • {sourceRows.length} rows</p>}
-      {error && <div className="alert error">{error}</div>}{message && <div className="alert info">{message}</div>}
-    </section>
-    {mappedRows.length > 0 && <section className="recent-card"><div className="section-head"><div><p className="eyebrow">Step 2</p><h3>Review and validate</h3></div><span className={validation.length ? 'status-badge danger' : 'status-badge'}>{validation.length ? `${validation.length} validation issue${validation.length===1?'':'s'}` : `${mappedRows.length} rows ready`}</span></div>
-      {validation.length > 0 && <div className="alert error">{validation.slice(0,8).map((v,i)=><div key={i}>{v}</div>)}{validation.length > 8 && <div>…and {validation.length-8} more.</div>}</div>}
-      <div className="table-wrap"><table><thead><tr><th>Row</th>{previewColumns.map(c => <th key={c}>{c.replaceAll('_',' ')}</th>)}</tr></thead><tbody>{mappedRows.slice(0,10).map((r,i)=><tr key={i}><td>{i+2}</td>{previewColumns.map(c=><td key={c}>{r[c] || '—'}</td>)}</tr>)}</tbody></table></div>
-      <div className="section-head import-footer"><p className="hint">Showing the first 10 rows. Imports are all-or-nothing.{type === 'payments' ? ' An identical payment import batch cannot be imported twice.' : type === 'invoices' ? ' Invoice unit prices are rounded to paise before line totals are calculated.' : ''}</p><button className="primary" disabled={busy || validation.length > 0} onClick={() => void importRows()}>{busy ? 'Importing…' : `Import ${mappedRows.length} rows`}</button></div>
-    </section>}
-  </main>;
+  setBook(null);setSheet('');setFileName('');if(inputRef.current)inputRef.current.value='';
+ }catch(e){setError(e instanceof Error?e.message:'The import could not be completed.');setMessage('Import failed. Your workbook and mapping are preserved so you can correct and retry.')}finally{setBusy(false)}}
+ if(isAdmin===false)return <main className="main-content"><header className="topbar"><div><p className="eyebrow">Data Import</p><h1>Admin access required</h1></div></header><section className="setup-card"><div><h3>Historical data import is restricted</h3><p>Only an Admin can import business records.</p></div><button className="secondary" onClick={onBack}>Back</button></section></main>;
+ if(isAdmin===null)return <main className="main-content"><div className="mini-empty">Checking access…</div></main>;
+ return <main className="main-content"><header className="topbar"><div><p className="eyebrow">Data migration</p><h1>Import business data</h1><p className="page-subtitle">Choose worksheets, map your own Excel headings and preview records before importing.</p></div><button className="secondary" onClick={onBack}>Back</button></header>
+ <section className="setup-card"><div><h3>1. Choose what you are importing</h3><p>Import contractors and materials from workbooks with different column names.</p></div><select value={type} onChange={e=>changeType(e.target.value as ImportType)}>{Object.entries(labels).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></section>
+ <section className="quick-card"><div className="section-head"><div><p className="eyebrow">Step 2</p><h3>Choose an Excel workbook</h3></div><button className="primary compact" disabled={busy} onClick={()=>inputRef.current?.click()}>{busy?'Reading…':'Choose file'}</button><input ref={inputRef} hidden type="file" accept=".xlsx,.csv" onChange={e=>void handleFile(e.target.files?.[0])}/></div>{fileName&&<p className="hint">{fileName} · {book?.worksheets.length??0} worksheets</p>}{error&&<div className="alert error">{error}</div>}{message&&<div className="alert info">{message}</div>}</section>
+ {book&&<><section className="setup-card"><div><h3>3. Select worksheet</h3><p>Each worksheet can have its own column layout. Select one to map and import.</p></div><select value={sheet} onChange={e=>changeSheet(e.target.value)}>{book.worksheets.map(x=><option key={x.name} value={x.name}>{x.name} ({x.rows.length} rows)</option>)}</select></section>
+ <section className="recent-card"><div className="section-head"><div><p className="eyebrow">Step 4</p><h3>Map Excel columns to CySec Construct fields</h3><p className="hint">Choose “Do not import” for columns you don't need. Matching suggestions are automatic and editable.</p></div><span className="status-badge">{sourceRows.length} rows</span></div>
+ <div className="table-wrap"><table><thead><tr><th>Excel column</th><th>Sample value</th><th>Import as</th></tr></thead><tbody>{(book.worksheets.find(x=>x.name===sheet)?.headers??[]).map(h=><tr key={h}><td><strong>{h}</strong></td><td>{sourceRows.find(r=>r[h]?.trim())?.[h]??'—'}</td><td><select value={mapping[h]??''} onChange={e=>setMapping(m=>({...m,[h]:e.target.value}))}><option value="">Do not import</option>{fields[type].map(f=><option key={f.key} value={f.key}>{f.label}{f.required?' *':''}</option>)}</select></td></tr>)}</tbody></table></div></section>
+ <section className="recent-card"><div className="section-head"><div><p className="eyebrow">Step 5</p><h3>Preview and validate</h3></div><span className={validation.length?'status-badge danger':'status-badge'}>{validation.length?`${validation.length} issue(s)`:`${preview.length} rows ready`}</span></div>{validation.length>0&&<div className="alert error">{validation.slice(0,10).map((v,i)=><div key={i}>{v}</div>)}{validation.length>10&&<div>…and {validation.length-10} more.</div>}</div>}<div className="table-wrap"><table><thead><tr><th>Row</th>{fields[type].filter(f=>Object.values(mapping).includes(f.key)).map(f=><th key={f.key}>{f.label}</th>)}</tr></thead><tbody>{preview.slice(0,10).map((r,i)=><tr key={i}><td>{i+2}</td>{fields[type].filter(f=>Object.values(mapping).includes(f.key)).map(f=><td key={f.key}>{r[f.key]||'—'}</td>)}</tr>)}</tbody></table></div><div className="section-head import-footer"><p className="hint">Showing first 10 rows. Contractor imports do not create work orders or material challans.</p><button className="primary" disabled={busy||validation.length>0||!preview.length} onClick={()=>void importRows()}>{busy?'Importing…':`Import ${preview.length} rows`}</button></div></section></>}
+ </main>;
 }
