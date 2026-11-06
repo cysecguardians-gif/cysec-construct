@@ -58,6 +58,7 @@ export default function DataImportPage({ supabase, organizationId, onBack }: Pro
         checkNumber(r.gst_rate, 'gst_rate', row, { min: 0, max: 100 });
         checkNumber(r.selling_price, 'selling_price', row, { min: 0 });
         checkNumber(r.quantity, 'quantity', row, { min: 0 });
+        if (r.quantity.trim() && Number(r.quantity) > 0) errors.push(`Row ${row}: import materials with quantity 0 or blank, then import opening balances through Stock Ledger so every stock balance has a matching movement record.`);
       }
       if (type === 'invoices') {
         checkNumber(r.quantity, 'quantity', row, { min: 0, exclusiveMin: true });
@@ -80,12 +81,25 @@ export default function DataImportPage({ supabase, organizationId, onBack }: Pro
   function changeType(next: ImportType) { setType(next); if (sourceRows.length) setMappedRows(buildRows(next, sourceRows) as Record<string,string>[]); setError(''); setMessage(''); }
 
   async function importRows() {
-    if (!mappedRows.length || validation.length) return;
+    if (!mappedRows.length || validation.length || busy || isAdmin !== true) return;
     setBusy(true); setError(''); setMessage('Importing…');
     const rpc = type === 'customers' ? 'import_customers' : type === 'materials' ? 'import_materials' : type === 'stock' ? 'import_stock_movements' : type === 'invoices' ? 'import_historical_invoices' : 'import_historical_payments';
-    const { data, error: e } = await supabase.rpc(rpc, { p_organization_id: organizationId, p_rows: mappedRows });
-    if (e) setError(e.message); else setMessage(`Import complete: ${JSON.stringify(data)}. The import was written atomically.`);
-    setBusy(false);
+    try {
+      const { data, error: e } = await supabase.rpc(rpc, { p_organization_id: organizationId, p_rows: mappedRows });
+      if (e) {
+        setError(e.message);
+        setMessage('Import failed. No rows from this database function call were committed; review the error and correct the source before retrying.');
+      } else {
+        setMessage(`Import complete: ${JSON.stringify(data)}. The database function committed the import as one transaction.`);
+        setSourceRows([]); setMappedRows([]); setFileName('');
+        if (inputRef.current) inputRef.current.value = '';
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'The import could not be completed.');
+      setMessage('Import failed. Your preview is preserved so you can review it before retrying.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (isAdmin === false) return <main className="main-content"><header className="topbar"><div><p className="eyebrow">Data Import</p><h1>Admin access required</h1></div></header><section className="setup-card"><div><h3>Historical data import is restricted</h3><p>Only an Admin can import customer, material, stock, invoice or payment history.</p></div><button className="secondary" onClick={onBack}>Back</button></section></main>;
