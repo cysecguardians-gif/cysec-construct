@@ -140,7 +140,7 @@ create table if not exists public.client_bills (
 -- The legacy amount_claimed_paise and notes fields carry the same business
 -- values as the current amount_paise and description fields; rename them
 -- instead of creating empty financial columns or losing existing data.
-do $
+do $migration$
 begin
   if exists (
     select 1 from information_schema.columns
@@ -177,7 +177,7 @@ begin
   ) then
     alter table public.client_bills rename column notes to description;
   end if;
-end $;
+end $migration$;
 
 alter table public.client_bills
   add column if not exists project_id uuid,
@@ -207,7 +207,7 @@ create table if not exists public.client_receipts (
 
 -- Preserve legacy receipt metadata while aligning the columns used by the
 -- current client-receivables workflow.
-do $
+do $migration$
 begin
   if exists (
     select 1 from information_schema.columns
@@ -220,7 +220,7 @@ begin
   ) then
     alter table public.client_receipts rename column recorded_by to created_by;
   end if;
-end $;
+end $migration$;
 
 alter table public.client_receipts
   add column if not exists receipt_number text,
@@ -245,7 +245,7 @@ create table if not exists public.client_receipt_allocations (
 
 -- Legacy receipts stored a single bill_id directly on the receipt. Convert
 -- those links into allocation rows without duplicating any existing allocation.
-do $
+do $migration$
 begin
   if exists (
     select 1 from information_schema.columns
@@ -263,7 +263,7 @@ begin
           and a.receipt_id=r.id and a.bill_id=r.bill_id
       );
   end if;
-end $;
+end $migration$;
 
 create index if not exists idx_client_receipts_contract on public.client_receipts(organization_id, contract_id, receipt_date desc);
 create index if not exists idx_client_allocations_bill on public.client_receipt_allocations(organization_id, bill_id);
