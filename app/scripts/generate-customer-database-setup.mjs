@@ -23,6 +23,7 @@ const migrationFiles = [
   '0013_construction_domain_foundation.sql',
   '0014_construction_transactional_operations.sql',
   '0015_construction_workflow_controls.sql',
+  '0016_stock_import_and_zero_settlement.sql',
 ];
 
 const sections = [];
