@@ -9,11 +9,12 @@ type WorkOrder={id:string;po_number:string;contractor_id:string;contract_id:stri
 type IssueLine={work_order_id:string;issue_item_id:string;material_name_snapshot:string;quantity_issued:number;quantity_returned:number;quantity_used:number};
 const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2});
 const paise=(v:string)=>Math.round((Number(v)||0)*100);
+const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 type Props={supabase:SupabaseClient;organizationId:string;onBack:()=>void};
 export default function ContractorManagementPage({supabase,organizationId,onBack}:Props){
  const [contractors,setContractors]=useState<Contractor[]>([]),[contracts,setContracts]=useState<Contract[]>([]),[projects,setProjects]=useState<Project[]>([]),[materials,setMaterials]=useState<Material[]>([]),[orders,setOrders]=useState<WorkOrder[]>([]),[issueLines,setIssueLines]=useState<IssueLine[]>([]);
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
- const [poDate,setPoDate]=useState(new Date().toISOString().slice(0,10)),[advanceDate,setAdvanceDate]=useState(new Date().toISOString().slice(0,10)),[issueDate,setIssueDate]=useState(new Date().toISOString().slice(0,10)),[returnDate,setReturnDate]=useState(new Date().toISOString().slice(0,10));
+ const [poDate,setPoDate]=useState(localDate(new Date())),[advanceDate,setAdvanceDate]=useState(localDate(new Date())),[issueDate,setIssueDate]=useState(localDate(new Date())),[returnDate,setReturnDate]=useState(localDate(new Date()));
  const [name,setName]=useState(''),[type,setType]=useState('subcontractor');
  const [po,setPo]=useState(''),[contractId,setContractId]=useState(''),[projectId,setProjectId]=useState(''),[contractorId,setContractorId]=useState(''),[basis,setBasis]=useState('fixed'),[fixed,setFixed]=useState(''),[percentage,setPercentage]=useState(''),[description,setDescription]=useState('');
  const [advancePo,setAdvancePo]=useState(''),[advanceAmount,setAdvanceAmount]=useState(''),[advanceMethod,setAdvanceMethod]=useState('cash');
