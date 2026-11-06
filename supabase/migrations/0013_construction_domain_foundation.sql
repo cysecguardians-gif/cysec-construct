@@ -288,6 +288,64 @@ create table if not exists public.client_deductions (
     references public.client_bills(organization_id, id) on delete restrict
 );
 
+-- Upgrade legacy deduction columns without discarding existing records.
+-- These names represent the same stored values in the earlier receivables schema.
+do $migration$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='deduction_type'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='category'
+  ) then
+    alter table public.client_deductions rename column deduction_type to category;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='is_recoverable'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='recoverable'
+  ) then
+    alter table public.client_deductions rename column is_recoverable to recoverable;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='notes'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='description'
+  ) then
+    alter table public.client_deductions rename column notes to description;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='recorded_by'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_deductions'
+      and column_name='created_by'
+  ) then
+    alter table public.client_deductions rename column recorded_by to created_by;
+  end if;
+end $migration$;
+
+alter table public.client_deductions
+  add column if not exists description text,
+  add column if not exists recoverable boolean not null default false,
+  add column if not exists created_by uuid references public.profiles(id) on delete set null;
+
 create index if not exists idx_client_deductions_contract on public.client_deductions(organization_id, contract_id, deduction_date desc);
 
 -- Contract finance summary. "Pending against bills" is bill value less allocated
