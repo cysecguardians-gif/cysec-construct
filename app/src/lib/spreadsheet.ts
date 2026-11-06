@@ -23,16 +23,27 @@ function plain(value:unknown):string{
  }
  return String(value).trim();
 }
+function normalizeHeader(value:string):string{return value.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
 function bestHeaderRow(ws:ExcelJS.Worksheet):number{
+ const limit=Math.min(Math.max(ws.actualRowCount,1),40);
  let best=1,bestScore=-1;
- const limit=Math.min(Math.max(ws.actualRowCount,1),25);
  for(let n=1;n<=limit;n++){
-  const row=ws.getRow(n);let nonEmpty=0,textLike=0;
-  row.eachCell({includeEmpty:false},cell=>{const value=cell.value;if(value!==null&&value!==undefined&&plain(value)!==''){nonEmpty++;if(typeof value==='string'||typeof value==='number')textLike++;}});
-  const score=nonEmpty*3+textLike;
+  const values:string[]=[];
+  ws.getRow(n).eachCell({includeEmpty:false},cell=>{const v=plain(cell.value);if(v)values.push(normalizeHeader(v));});
+  const joined=values.join(' | ');
+  const hasItem=values.some(v=>v.includes('item of discription')||v.includes('item of description')||v==='item description'||v==='material name');
+  const hasUnit=values.some(v=>v==='unit'||v==='uom'||v==='type');
+  const hasSerial=values.some(v=>v==='sl no'||v==='sl number'||v==='serial no'||v==='s no');
+  const hasTotal=values.some(v=>v==='total qty'||v==='total quantity');
+  const score=(hasItem?100:0)+(hasUnit?35:0)+(hasSerial?25:0)+(hasTotal?20:0)+Math.min(values.length,15);
   if(score>bestScore){best=n;bestScore=score;}
+  if(hasItem&&hasUnit&&(hasSerial||hasTotal))return n;
  }
  return best;
+}
+function uniqueHeaders(raw:string[]):string[]{
+ const seen=new Map<string,number>();
+ return raw.map((header,i)=>{const base=header.trim()||`Column ${i+1}`;const count=(seen.get(base)??0)+1;seen.set(base,count);return count===1?base:`${base} (${count})`;});
 }
 function formulaValue(cell:ExcelJS.Cell,ws:ExcelJS.Worksheet):string{
  const value=cell.value;
@@ -55,7 +66,7 @@ export async function readSpreadsheet(file:File):Promise<SpreadsheetData>{
  workbook.eachSheet(ws=>{
   const headerRow=bestHeaderRow(ws),header=ws.getRow(headerRow);
   const lastColumn=Math.max(header.cellCount,ws.actualColumnCount);
-  const headers=Array.from({length:lastColumn},(_,i)=>plain(header.getCell(i+1).value)||`Column ${i+1}`);
+  const headers=uniqueHeaders(Array.from({length:lastColumn},(_,i)=>plain(header.getCell(i+1).value)||`Column ${i+1}`));
   const rows:SpreadsheetRow[]=[];
   ws.eachRow((row,rowNumber)=>{if(rowNumber<=headerRow)return;const record:SpreadsheetRow={};headers.forEach((h,i)=>record[h]=formulaValue(row.getCell(i+1),ws));if(Object.values(record).some(v=>v.trim()))rows.push(record)});
   if(rows.length)worksheets.push({name:ws.name,headers,rows,headerRow});
