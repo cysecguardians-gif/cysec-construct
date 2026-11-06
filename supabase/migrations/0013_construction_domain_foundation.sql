@@ -40,12 +40,11 @@ create table if not exists public.client_companies (
   unique (organization_id, name)
 );
 
-create table if not exists public.contracts (
-
--- Ensure this composite key exists even when the table was created by an
--- earlier/partial setup: CREATE TABLE IF NOT EXISTS does not add constraints.
 create unique index if not exists uq_client_companies_organization_id_id
   on public.client_companies(organization_id, id);
+
+create table if not exists public.contracts (
+
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   client_company_id uuid not null,
@@ -72,14 +71,14 @@ create unique index if not exists uq_client_companies_organization_id_id
     references public.client_companies(organization_id, id) on delete restrict
 );
 
+create unique index if not exists uq_contracts_organization_id_id
+  on public.contracts(organization_id, id);
+
 create index if not exists idx_contracts_client on public.contracts(organization_id, client_company_id);
 create index if not exists idx_contracts_status on public.contracts(organization_id, status);
 
 create table if not exists public.projects (
 
--- Required by tenant-scoped foreign keys, including on pre-existing tables.
-create unique index if not exists uq_contracts_organization_id_id
-  on public.contracts(organization_id, id);
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   contract_id uuid not null,
@@ -102,14 +101,14 @@ create unique index if not exists uq_contracts_organization_id_id
     references public.contracts(organization_id, id) on delete restrict
 );
 
-create index if not exists idx_projects_contract on public.projects(organization_id, contract_id);
+create index if not exists idx_projects_contract
+
+create unique index if not exists uq_projects_organization_id_id
+  on public.projects(organization_id, id); on public.projects(organization_id, contract_id);
 
 -- ============================================================
 -- 2. Client bills, receipts, allocations and deductions
 
--- Required by tenant-scoped foreign keys when projects already existed.
-create unique index if not exists uq_projects_organization_id_id
-  on public.projects(organization_id, id);
 -- ============================================================
 
 create table if not exists public.client_bills (
@@ -136,12 +135,11 @@ create table if not exists public.client_bills (
     references public.projects(organization_id, id) on delete restrict
 );
 
-create table if not exists public.client_receipts (
-
--- CREATE TABLE IF NOT EXISTS does not retrofit the composite key onto an
--- existing table. Add the referenced key explicitly before creating receipts.
 create unique index if not exists uq_client_bills_organization_id_id
   on public.client_bills(organization_id, id);
+
+create table if not exists public.client_receipts (
+
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   contract_id uuid not null,
@@ -158,12 +156,11 @@ create unique index if not exists uq_client_bills_organization_id_id
     references public.contracts(organization_id, id) on delete restrict
 );
 
-create table if not exists public.client_receipt_allocations (
+create table if not exists public.client_receipt_allocations
 
--- Allocations reference (organization_id, id), so make the composite key
--- available even if client_receipts predates this migration.
 create unique index if not exists uq_client_receipts_organization_id_id
-  on public.client_receipts(organization_id, id);
+  on public.client_receipts(organization_id, id); (
+
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   receipt_id uuid not null,
