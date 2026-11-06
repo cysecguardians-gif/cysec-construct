@@ -23,6 +23,15 @@ begin
 
   new.reference_number := btrim(new.reference_number);
 
+  -- Existing historical duplicates must not block unrelated edits. Recheck
+  -- uniqueness only when the tenant or normalized reference actually changes.
+  if tg_op = 'UPDATE'
+     and new.organization_id is not distinct from old.organization_id
+     and lower(btrim(coalesce(new.reference_number, ''))) is not distinct from
+         lower(btrim(coalesce(old.reference_number, ''))) then
+    return new;
+  end if;
+
   perform pg_advisory_xact_lock(
     hashtextextended(new.organization_id::text || ':' || v_reference, 0)
   );
