@@ -53,9 +53,9 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       ? `RPC succeeded • authenticated=${String(appStatus.authenticated ?? 'unknown')} • schema_version=${String(appStatus.schema_version ?? 'null')}`
       : 'RPC succeeded, but returned no status object.';
 
-    if (version < 25) {
+    if (version < 26) {
       setMessage(`${responseSummary}.`);
-      setError('The database schema exists but the app did not receive schema version 25 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
+      setError('The database schema exists but the app did not receive schema version 26 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
       setBusy(false);
       return;
     }
