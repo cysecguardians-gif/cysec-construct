@@ -30,6 +30,7 @@ const migrationFiles = [
   '0020_financial_reference_deduplication.sql',
   '0021_contractor_advance_settlement_locking.sql',
   '0022_contractor_recovery_completion_gate.sql',
+  '0023_financial_reference_update_guard.sql',
 ];
 
 const sections = [];
