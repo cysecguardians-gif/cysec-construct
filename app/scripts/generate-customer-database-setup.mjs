@@ -55,5 +55,17 @@ const sql = [
 ].join('\n\n');
 
 await fs.mkdir(outputDir, { recursive: true });
-await fs.writeFile(outputFile, `${JSON.stringify(sql, null, 2)}\n`, 'utf8');
+await fs.writeFile(outputFile, `${JSON.stringify(sql, null, 2)}\\n`, 'utf8');
+
+const upgradeFile = '0026_material_purchase_status_compatibility.sql';
+const upgradeSource = await fs.readFile(path.join(migrationDir, upgradeFile), 'utf8');
+const upgradeSql = [
+  '-- CySec Construct — Customer Database Upgrade',
+  '-- Apply this migration only when upgrading an existing schema v25 database to v26.',
+  '',
+  `-- Internal migration: ${upgradeFile}`,
+  upgradeSource.trim(),
+  '',
+].join('\\n\\n');
+await fs.writeFile(path.join(outputDir, 'customerDatabaseUpgrade.json'), `${JSON.stringify(upgradeSql, null, 2)}\\n`, 'utf8');
 console.log(`Generated customer database setup SQL: ${outputFile}`);
