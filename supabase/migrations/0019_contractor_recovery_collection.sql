@@ -58,7 +58,7 @@ returns void
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_work_order_id uuid;
   v_final_payable bigint;
@@ -116,7 +116,7 @@ begin
     )
   );
 end;
-$;
+$$;
 
 grant execute on function public.approve_contractor_settlement(uuid,uuid) to authenticated;
 revoke execute on function public.approve_contractor_settlement(uuid,uuid) from anon;
