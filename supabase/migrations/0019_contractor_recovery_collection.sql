@@ -41,7 +41,80 @@ create policy contractor_recovery_payments_member_select
   on public.contractor_recovery_payments
   for select to authenticated
   using (public.is_org_member(organization_id));
+grant select on public.contractor_recovery_payments to authenticated;
 revoke insert, update, delete on public.contractor_recovery_payments from anon, authenticated;
+
+
+create or replace function public.approve_contractor_settlement(
+  p_organization_id uuid,
+  p_settlement_id uuid
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_work_order_id uuid;
+  v_final_payable bigint;
+  v_recovery bigint;
+  v_new_status text;
+  v_recovery_status text;
+begin
+  if not public.is_org_admin(p_organization_id) then
+    raise exception 'administrator_required_to_approve_settlement';
+  end if;
+
+  select work_order_id, final_payable_paise, contractor_recovery_paise
+    into v_work_order_id, v_final_payable, v_recovery
+  from public.contractor_settlements
+  where id = p_settlement_id
+    and organization_id = p_organization_id
+    and status = 'draft'
+  for update;
+
+  if not found then
+    raise exception 'draft_settlement_not_found';
+  end if;
+
+  v_new_status := case
+    when v_final_payable = 0 and v_recovery = 0 then 'paid'
+    else 'approved'
+  end;
+  v_recovery_status := case when v_recovery > 0 then 'outstanding' else 'not_due' end;
+
+  update public.contractor_settlements
+  set status = v_new_status,
+      recovery_status = v_recovery_status,
+      approved_by = auth.uid()
+  where id = p_settlement_id
+    and organization_id = p_organization_id;
+
+  if v_new_status = 'paid' then
+    update public.contractor_work_orders
+    set status = 'settled'
+    where id = v_work_order_id
+      and organization_id = p_organization_id
+      and status = 'under_closure';
+  end if;
+
+  insert into public.audit_log(
+    organization_id, user_id, action, entity_type, entity_id, details
+  ) values (
+    p_organization_id, auth.uid(), 'contractor_settlement_approved',
+    'contractor_settlement', p_settlement_id,
+    jsonb_build_object(
+      'status', v_new_status,
+      'recovery_status', v_recovery_status,
+      'final_payable_paise', v_final_payable,
+      'contractor_recovery_paise', v_recovery
+    )
+  );
+end;
+$;
+
+grant execute on function public.approve_contractor_settlement(uuid,uuid) to authenticated;
+revoke execute on function public.approve_contractor_settlement(uuid,uuid) from anon;
 
 create or replace function public.record_contractor_recovery_payment(
   p_organization_id uuid,
