@@ -4,6 +4,101 @@
 
 begin;
 
+-- Material imports create catalogue records only. Opening balances must be
+-- imported through import_stock_movements so every balance has a ledger entry.
+create or replace function public.import_materials(p_organization_id uuid, p_rows jsonb)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $
+declare
+  v_row jsonb;
+  v_count integer := 0;
+  v_user uuid := auth.uid();
+  v_unit_id uuid;
+  v_category_id uuid;
+  v_name text;
+  v_unit text;
+  v_category text;
+  v_qty numeric;
+  v_price numeric;
+  v_gst numeric;
+begin
+  if not public.is_org_admin(p_organization_id) then
+    raise exception 'administrator_required';
+  end if;
+  if p_rows is null or jsonb_typeof(p_rows) <> 'array' then
+    raise exception 'rows_must_be_array';
+  end if;
+  if jsonb_array_length(p_rows) = 0 then
+    raise exception 'material_import_rows_required';
+  end if;
+
+  for v_row in select value from jsonb_array_elements(p_rows) loop
+    -- Reset optional foreign keys for every row; otherwise a missing unit or
+    -- category could accidentally inherit the previous row's identifier.
+    v_unit_id := null;
+    v_category_id := null;
+    v_name := nullif(trim(v_row->>'name'), '');
+    if v_name is null then
+      raise exception 'material_name_required';
+    end if;
+    v_unit := nullif(trim(v_row->>'unit'), '');
+    v_category := nullif(trim(v_row->>'category'), '');
+    v_qty := coalesce(nullif(v_row->>'quantity', '')::numeric, 0);
+    v_price := coalesce(nullif(v_row->>'selling_price', '')::numeric, 0);
+    v_gst := coalesce(nullif(v_row->>'gst_rate', '')::numeric, 0);
+
+    if v_qty::text in ('NaN','Infinity','-Infinity')
+       or v_price::text in ('NaN','Infinity','-Infinity')
+       or v_gst::text in ('NaN','Infinity','-Infinity')
+       or v_qty <> 0 or v_price < 0 or v_gst < 0 or v_gst > 100 then
+      raise exception 'invalid_material_numeric_value';
+    end if;
+
+    if v_unit is not null then
+      select id into v_unit_id
+      from public.units
+      where organization_id = p_organization_id
+        and (lower(name)=lower(v_unit) or lower(short_code)=lower(v_unit))
+      limit 1;
+      if v_unit_id is null then
+        insert into public.units(organization_id, name, short_code)
+        values (p_organization_id, v_unit,
+          lower(regexp_replace(v_unit, '[^a-zA-Z0-9]+', '', 'g')))
+        returning id into v_unit_id;
+      end if;
+    end if;
+
+    if v_category is not null then
+      insert into public.material_categories(organization_id, name)
+      values (p_organization_id, v_category)
+      on conflict (organization_id, name) do update set name = excluded.name
+      returning id into v_category_id;
+    end if;
+
+    insert into public.materials(
+      organization_id, unit_id, category_id, name, hsn_sac_code,
+      gst_rate, selling_price_paise, current_quantity
+    ) values (
+      p_organization_id, v_unit_id, v_category_id, v_name,
+      nullif(trim(v_row->>'hsn_sac_code'), ''), v_gst,
+      round(v_price * 100), 0
+    );
+    v_count := v_count + 1;
+  end loop;
+
+  insert into public.audit_log(organization_id, user_id, action, entity_type, details)
+  values (p_organization_id, v_user, 'historical_import', 'materials',
+    jsonb_build_object('count', v_count));
+  return jsonb_build_object('imported', v_count);
+end;
+$;
+
+grant execute on function public.import_materials(uuid, jsonb) to authenticated;
+revoke execute on function public.import_materials(uuid, jsonb) from anon;
+
 create or replace function public.import_stock_movements(p_organization_id uuid, p_rows jsonb)
 returns jsonb
 language plpgsql
