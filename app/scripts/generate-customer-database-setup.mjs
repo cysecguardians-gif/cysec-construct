@@ -34,6 +34,7 @@ const migrationFiles = [
   '0024_recovery_after_payable_paid.sql',
   '0025_zero_payable_recovery_closure.sql',
   '0026_material_purchase_status_compatibility.sql',
+  '0027_idempotent_material_import.sql',
 ];
 
 const sections = [];
@@ -57,7 +58,7 @@ const sql = [
 await fs.mkdir(outputDir, { recursive: true });
 await fs.writeFile(outputFile, `${JSON.stringify(sql, null, 2)}\n`, 'utf8');
 
-const upgradeFile = '0026_material_purchase_status_compatibility.sql';
+const upgradeFile = '0027_idempotent_material_import.sql';
 const upgradeSource = await fs.readFile(path.join(migrationDir, upgradeFile), 'utf8');
 const upgradeSql = [
   '-- CySec Construct — Customer Database Upgrade',
