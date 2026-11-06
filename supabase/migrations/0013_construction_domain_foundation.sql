@@ -102,9 +102,10 @@ create table if not exists public.projects (
 );
 
 create index if not exists idx_projects_contract
+  on public.projects(organization_id, contract_id);
 
 create unique index if not exists uq_projects_organization_id_id
-  on public.projects(organization_id, id); on public.projects(organization_id, contract_id);
+  on public.projects(organization_id, id);
 
 -- ============================================================
 -- 2. Client bills, receipts, allocations and deductions
