@@ -553,6 +553,124 @@ create table if not exists public.contractor_work_orders (
   )
 );
 
+-- Align an existing contractor_work_orders table from the earlier project-led
+-- schema with the contract-led construction workflow. The contract is derived
+-- from the already-linked project, preserving the relationship and existing
+-- rows. Legacy column names are renamed rather than discarded.
+do $migration$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='agreed_percentage'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='percentage_rate'
+  ) then
+    alter table public.contractor_work_orders rename column agreed_percentage to percentage_rate;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='basis_contract_value_paise'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='percentage_base_value_paise'
+  ) then
+    alter table public.contractor_work_orders rename column basis_contract_value_paise to percentage_base_value_paise;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='scope_of_work'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='work_description'
+  ) then
+    alter table public.contractor_work_orders rename column scope_of_work to work_description;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='expected_end_date'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='expected_completion_date'
+  ) then
+    alter table public.contractor_work_orders rename column expected_end_date to expected_completion_date;
+  end if;
+
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='actual_end_date'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='contractor_work_orders'
+      and column_name='actual_completion_date'
+  ) then
+    alter table public.contractor_work_orders rename column actual_end_date to actual_completion_date;
+  end if;
+end $migration$;
+
+alter table public.contractor_work_orders
+  add column if not exists contract_id uuid,
+  add column if not exists project_id uuid,
+  add column if not exists work_description text,
+  add column if not exists percentage_rate numeric(7,4),
+  add column if not exists percentage_base_value_paise bigint,
+  add column if not exists currency_code text not null default 'INR',
+  add column if not exists expected_completion_date date,
+  add column if not exists actual_completion_date date;
+
+-- A legacy work order was attached to a project; projects already identify
+-- their awarded contract. Backfill that contract before enforcing the
+-- current required relationship.
+update public.contractor_work_orders wo
+set contract_id = p.contract_id
+from public.projects p
+where p.id = wo.project_id
+  and p.organization_id = wo.organization_id
+  and wo.contract_id is null;
+
+do $migration$
+begin
+  if exists (
+    select 1 from public.contractor_work_orders
+    where contract_id is null
+  ) then
+    raise exception 'Cannot upgrade contractor_work_orders: one or more rows have no project-to-contract mapping';
+  end if;
+end $migration$;
+
+alter table public.contractor_work_orders
+  alter column contract_id set not null,
+  alter column project_id drop not null;
+
+create unique index if not exists uq_contractor_work_orders_organization_id_id
+  on public.contractor_work_orders(organization_id, id);
+
+do $migration$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname='contractor_work_orders_organization_contract_fk'
+      and conrelid='public.contractor_work_orders'::regclass
+  ) then
+    alter table public.contractor_work_orders
+      add constraint contractor_work_orders_organization_contract_fk
+      foreign key (organization_id, contract_id)
+      references public.contracts(organization_id, id) on delete restrict;
+  end if;
+end $migration$;
+
 create index if not exists idx_work_orders_contractor on public.contractor_work_orders(organization_id, contractor_id, po_date desc);
 create index if not exists idx_work_orders_contract on public.contractor_work_orders(organization_id, contract_id);
 create index if not exists idx_work_orders_project on public.contractor_work_orders(organization_id, project_id);
