@@ -55,7 +55,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
     if (version < 23) {
       setMessage(`${responseSummary}.`);
-      setError('The database schema exists but the app did not receive schema version 22 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
+      setError('The database schema exists but the app did not receive schema version 23 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
       setBusy(false);
       return;
     }
