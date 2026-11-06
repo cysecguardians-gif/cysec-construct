@@ -11,7 +11,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $
+as $$
 declare
   v_row jsonb;
   v_count integer := 0;
@@ -94,7 +94,7 @@ begin
     jsonb_build_object('count', v_count));
   return jsonb_build_object('imported', v_count);
 end;
-$;
+$$;
 
 grant execute on function public.import_materials(uuid, jsonb) to authenticated;
 revoke execute on function public.import_materials(uuid, jsonb) from anon;
