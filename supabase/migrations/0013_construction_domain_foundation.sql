@@ -351,7 +351,12 @@ create index if not exists idx_client_deductions_contract on public.client_deduc
 -- Contract finance summary. "Pending against bills" is bill value less allocated
 -- receipts; deductions and retention remain separately visible and are not
 -- misrepresented as cash received.
-create or replace view public.contract_finance_summary
+-- The customer schema may already contain a legacy view with a different output
+-- column layout. Recreate this reporting view so its named columns match the
+-- current contract-finance contract; no table data is affected.
+drop view if exists public.contract_finance_summary;
+
+create view public.contract_finance_summary
 with (security_invoker = true) as
 select
   c.id as contract_id,
