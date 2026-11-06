@@ -25,11 +25,12 @@ declare
   v_work_order_id uuid;
   v_recovery_total bigint;
   v_recovered bigint;
+  v_status text;
 begin
   if not public.is_org_member(p_organization_id) then raise exception 'organization_membership_required'; end if;
   if p_amount_paise<=0 then raise exception 'payment_amount_must_be_positive'; end if;
-  select final_payable_paise, work_order_id, contractor_recovery_paise
-    into v_total, v_work_order_id, v_recovery_total
+  select final_payable_paise, work_order_id, contractor_recovery_paise, status
+    into v_total, v_work_order_id, v_recovery_total, v_status
   from public.contractor_settlements
   where id=p_settlement_id and organization_id=p_organization_id and status in ('approved','partially_paid')
   for update;
@@ -50,16 +51,18 @@ begin
   set status=case when v_paid+p_amount_paise=v_total then 'paid' else 'partially_paid' end
   where id=p_settlement_id;
 
-  if v_paid+p_amount_paise=v_total then
-    select coalesce(sum(amount_paise),0)::bigint into v_recovered
-    from public.contractor_recovery_payments
-    where organization_id=p_organization_id and settlement_id=p_settlement_id;
+  select coalesce(sum(amount_paise),0)::bigint into v_recovered
+  from public.contractor_recovery_payments
+  where organization_id=p_organization_id and settlement_id=p_settlement_id;
 
-    if v_recovery_total <= v_recovered then
+  if v_paid+p_amount_paise=v_total and v_recovery_total <= v_recovered then
       update public.contractor_work_orders
       set status='settled'
       where id=v_work_order_id and organization_id=p_organization_id;
-    end if;
+  elsif v_recovery_total <= v_recovered and v_status = 'paid' then
+    update public.contractor_work_orders
+    set status='settled'
+    where id=v_work_order_id and organization_id=p_organization_id and status='under_closure';
   end if;
 
   insert into public.audit_log(organization_id,user_id,action,entity_type,entity_id,details)
