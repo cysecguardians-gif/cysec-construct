@@ -49,9 +49,12 @@ begin
     raise exception 'payment_import_rows_required';
   end if;
 
-  -- jsonb canonicalizes object key order; array order remains significant.
+  -- Canonicalize object keys (jsonb) and sort rows so reordering the same
+  -- spreadsheet rows does not bypass duplicate-batch detection.
   -- This fingerprint is an idempotency key, not an authentication mechanism.
-  v_fingerprint := md5(p_rows::text);
+  select md5(coalesce(jsonb_agg(x.value order by x.value::text)::text, '[]'))
+    into v_fingerprint
+  from jsonb_array_elements(p_rows) as x(value);
   insert into public.historical_import_batches(
     organization_id, import_type, payload_fingerprint, imported_by
   ) values (
