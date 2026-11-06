@@ -788,8 +788,10 @@ create table if not exists public.material_reconciliations (
 );
 
 -- Reconciliation quantity is derived from issue, usage and return ledger rows.
-drop view if exists public.contractor_material_reconciliation_summary;
-create view public.contractor_material_reconciliation_summary
+-- Preserve dependent reporting views by replacing the view in place. The output
+-- column names and order remain stable; only the source snapshot expression
+-- below is adapted for legacy customer schemas.
+create or replace view public.contractor_material_reconciliation_summary
 with (security_invoker = true) as
 select
   ii.organization_id,
