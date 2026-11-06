@@ -59,3 +59,6 @@ This case verifies migrations 0024 and 0025 together: recovery must remain colle
 For each case, record the settlement row before and after each operation, the payment ledger rows, and the work-order status. Also verify the audit log entries. The test is a pass only when every expected state above is observed.
 
 This matrix documents the required test procedure; it is not evidence that the scenarios have already been executed.
+## UI acceptance check
+
+For cases A and C, after the outgoing payable is marked `paid` while recovery remains outstanding, reopen the settlement in the Contractor Closure screen. The recovery status, collected/outstanding totals, recovery date, amount, method, reference fields, and Record recovery action must remain visible. After the recovery is fully collected, the page should show the recovered confirmation and no longer offer another recovery entry.
