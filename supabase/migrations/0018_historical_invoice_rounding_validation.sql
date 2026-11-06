@@ -20,6 +20,7 @@ declare
   v_material_name text;
   v_qty numeric;
   v_unit_price numeric;
+  v_unit_price_paise_numeric numeric;
   v_unit_price_paise bigint;
   v_taxable_numeric numeric;
   v_taxable bigint;
@@ -75,10 +76,12 @@ begin
       raise exception 'invalid_invoice_numeric_value';
     end if;
 
-    v_unit_price_paise := round(v_unit_price * 100);
-    if v_unit_price_paise < 0 then
-      raise exception 'invalid_invoice_numeric_value';
+    v_unit_price_paise_numeric := round(v_unit_price * 100);
+    if v_unit_price_paise_numeric < 0
+       or v_unit_price_paise_numeric > 9223372036854775807 then
+      raise exception 'invoice_unit_price_exceeds_supported_range';
     end if;
+    v_unit_price_paise := v_unit_price_paise_numeric::bigint;
 
     -- Use the rounded paise price as the basis for the line total. This keeps
     -- the saved unit price and taxable amount arithmetically consistent.
