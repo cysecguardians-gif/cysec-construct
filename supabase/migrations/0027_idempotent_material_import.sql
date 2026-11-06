@@ -104,7 +104,7 @@ begin
       where id = v_existing_material_id;
       v_updated := v_updated + 1;
     else
-      insert into public.materials(
+      insert into public.materials as existing(
         organization_id, unit_id, category_id, name, hsn_sac_code,
         gst_rate, selling_price_paise
       )
@@ -114,11 +114,11 @@ begin
       )
       on conflict (organization_id, name)
       do update set
-        unit_id = coalesce(excluded.unit_id, public.materials.unit_id),
-        category_id = coalesce(excluded.category_id, public.materials.category_id),
-        hsn_sac_code = coalesce(excluded.hsn_sac_code, public.materials.hsn_sac_code),
-        gst_rate = case when v_row ? 'gst_rate' then excluded.gst_rate else public.materials.gst_rate end,
-        selling_price_paise = case when v_row ? 'selling_price' then excluded.selling_price_paise else public.materials.selling_price_paise end
+        unit_id = coalesce(excluded.unit_id, existing.unit_id),
+        category_id = coalesce(excluded.category_id, existing.category_id),
+        hsn_sac_code = coalesce(excluded.hsn_sac_code, existing.hsn_sac_code),
+        gst_rate = case when v_row ? 'gst_rate' then excluded.gst_rate else existing.gst_rate end,
+        selling_price_paise = case when v_row ? 'selling_price' then excluded.selling_price_paise else existing.selling_price_paise end
       returning id into v_existing_material_id;
       get diagnostics v_rows_affected = row_count;
       if v_rows_affected > 0 then
