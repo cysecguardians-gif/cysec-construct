@@ -24,6 +24,7 @@ const migrationFiles = [
   '0014_construction_transactional_operations.sql',
   '0015_construction_workflow_controls.sql',
   '0016_stock_import_and_zero_settlement.sql',
+  '0017_historical_payment_import_idempotency.sql',
 ];
 
 const sections = [];
