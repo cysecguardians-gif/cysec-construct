@@ -79,7 +79,7 @@ function AppShell({children,active,onNavigate,onSignOut,onChangeConnection}:{chi
   {id:'contractors',title:'Contractor Management',items:[{label:'Contractors & Work Orders',screen:'contractor-management' as Screen},{label:'Advances & Settlement',screen:'contractor-closure' as Screen}]},
  ];
  const [expanded,setExpanded]=useState<Record<string,boolean>>(()=>Object.fromEntries(groups.map(g=>[g.id,g.items.some(item=>item.screen===active)])));
- const navButton=(label:string,screen:Screen)=><button key={screen} className={active===screen?'nav-active':''} onClick={()=>onNavigate(screen)}>{label}</button>;
+ const navButton=(label:string,screen:Screen)=><button key={screen} className={active===screen||(screen==='dashboard'&&active==='overview')?'nav-active':''} onClick={()=>onNavigate(screen)}>{label}</button>;
  return <div className="app-shell"><aside className="sidebar"><div className="brand"><span className="brand-mark">CC</span><div><strong>CySec Construct</strong><small>Construction Management</small></div></div><nav>
   {navButton('Overview','dashboard')}
   {groups.map(group=><section className="sidebar-group" key={group.id}><button type="button" className="sidebar-group-toggle" aria-expanded={Boolean(expanded[group.id])} onClick={()=>setExpanded(current=>({...current,[group.id]:!current}))}><span>{group.title}</span><span className="sidebar-chevron">{expanded[group.id]?'−':'+'}</span></button>{expanded[group.id]&&<div className="sidebar-group-items">{group.items.map(item=>navButton(item.label,item.screen))}</div>}</section>)}
