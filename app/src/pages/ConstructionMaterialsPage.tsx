@@ -6,6 +6,7 @@ type Purchase={id:string;purchase_number:string|null;vendor_invoice_number:strin
 type Props={supabase:SupabaseClient;organizationId:string;onBack:()=>void;onInventory:()=>void;onLedger:()=>void};
 const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2});
 const paise=(v:string)=>Math.round((Number(v)||0)*100);
+const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 export default function ConstructionMaterialsPage({supabase,organizationId,onBack,onInventory,onLedger}:Props){
  const [vendors,setVendors]=useState<Vendor[]>([]),[materials,setMaterials]=useState<Material[]>([]),[purchases,setPurchases]=useState<Purchase[]>([]);
  const [vendorName,setVendorName]=useState(''),[vendorGstin,setVendorGstin]=useState(''),[vendorPhone,setVendorPhone]=useState('');
