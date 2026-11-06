@@ -58,7 +58,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
 
     if (version < 26) {
       setMessage(`${responseSummary}.`);
-      setError('The database schema exists but the app did not receive schema version 26 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
+      setError('Schema version 25 detected. Apply the targeted migration 0026 using the upgrade SQL below, then verify again.');
       setBusy(false);
       return;
     }
