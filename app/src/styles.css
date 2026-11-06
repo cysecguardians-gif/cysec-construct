@@ -55,3 +55,51 @@ button.secondary{border:1px solid #d6dce5;border-radius:9px;padding:10px 14px;ba
 .sidebar-group-chevron { flex: 0 0 auto; }
 .sidebar-group-items { display: grid; gap: 3px; padding: 0 0 5px 10px; }
 .sidebar nav .sidebar-group-items button { width: 100%; min-height: 38px; position: relative; z-index: 2; cursor: pointer; }
+
+/* Tender & contract workspace layout refinement */
+.contract-setup-grid {
+  grid-template-columns: minmax(260px, .78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: 18px;
+  margin-top: 18px;
+}
+.contract-setup-grid > .panel {
+  align-self: start;
+  margin: 0;
+  padding: 22px;
+}
+.contract-setup-grid .panel.stack {
+  align-content: start;
+  justify-items: stretch;
+  gap: 16px;
+}
+.contract-setup-grid .panel h3 {
+  padding-bottom: 13px;
+  border-bottom: 1px solid #edf0f3;
+  font-size: 16px;
+  letter-spacing: -.015em;
+}
+.client-company-form { grid-template-rows: auto auto auto; }
+.client-company-form label { gap: 8px; }
+.client-company-form input { min-height: 44px; }
+.contract-setup-grid .primary {
+  justify-self: start;
+  width: auto;
+  min-width: 150px;
+  min-height: 42px;
+}
+.contract-create-form .two-col {
+  grid-template-columns: minmax(0,1fr) minmax(0,1fr);
+}
+.contract-create-form label { min-width: 0; }
+.contract-create-form input,
+.contract-create-form select { min-height: 44px; }
+.contract-create-form > .primary {
+  justify-self: stretch;
+  width: 100%;
+  margin-top: 2px;
+}
+@media(max-width:1100px) {
+  .contract-setup-grid { grid-template-columns: minmax(0,1fr); }
+  .client-company-form .primary { width: 100%; }
+}
