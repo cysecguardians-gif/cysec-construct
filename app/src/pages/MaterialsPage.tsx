@@ -86,7 +86,13 @@ export default function MaterialsPage({ supabase, organizationId, onBack }: Prop
       if (insertError) throw insertError;
       if (quantity > 0 && data) {
         const { error: stockError } = await supabase.rpc('adjust_stock', { p_organization_id: organizationId, p_material_id: data.id, p_quantity: quantity, p_notes: 'Opening stock' });
-        if (stockError) throw stockError;
+        if (stockError) {
+          setShowForm(false);
+          setEditing(null);
+          await load();
+          setError(`Material "${values.name.trim()}" was created, but opening stock was not recorded: ${stockError.message}. Use the Stock action to add the opening quantity.`);
+          return;
+        }
       }
     }
     setShowForm(false);
