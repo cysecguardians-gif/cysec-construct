@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Material Management System",
+  "productName": "CySec Construct",
   "version": "0.1.1",
   "identifier": "in.cysecguardians.materialmanagementsystem",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Material Management System",
+        "title": "CySec Construct",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
@@ -36,7 +36,7 @@
     "active": true,
     "targets": ["nsis", "msi"],
     "category": "Business",
-    "shortDescription": "Desktop material, customer, stock and invoice management",
+    "shortDescription": "Construction contracts, procurement, inventory and contractor management",
     "icon": ["icons/icon.ico"]
   }
 }
