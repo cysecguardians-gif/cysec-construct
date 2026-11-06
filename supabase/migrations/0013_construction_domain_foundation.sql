@@ -796,7 +796,7 @@ select
   wo.id as work_order_id,
   ii.id as issue_item_id,
   ii.material_id,
-  ii.material_name_snapshot,
+  ii.description_snapshot as material_name_snapshot,
   ii.unit_name_snapshot,
   ii.quantity_issued,
   coalesce(r.returned_quantity, 0)::numeric(14,3) as quantity_returned,
@@ -840,6 +840,12 @@ create table if not exists public.contractor_settlements (
 create unique index if not exists uq_active_settlement_per_work_order
   on public.contractor_settlements(organization_id, work_order_id)
   where status <> 'cancelled';
+
+-- Existing customer databases may have contractor_settlements keyed only by id.
+-- The tenant-scoped payment foreign key below references (organization_id, id),
+-- so ensure that exact column pair is unique even when the table predates this migration.
+create unique index if not exists uq_contractor_settlements_organization_id_id
+  on public.contractor_settlements(organization_id, id);
 
 create table if not exists public.contractor_settlement_payments (
   id uuid primary key default gen_random_uuid(),
