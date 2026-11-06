@@ -37,6 +37,7 @@ const migrationFiles = [
   '0027_idempotent_material_import.sql',
   '0028_contract_completion_date_compatibility.sql',
   '0029_client_customer_unification.sql',
+  '0030_client_company_legacy_columns.sql',
 ];
 
 const sections = [];
@@ -60,11 +61,11 @@ const sql = [
 await fs.mkdir(outputDir, { recursive: true });
 await fs.writeFile(outputFile, `${JSON.stringify(sql, null, 2)}\n`, 'utf8');
 
-const upgradeFile = '0029_client_customer_unification.sql';
+const upgradeFile = '0030_client_company_legacy_columns.sql';
 const upgradeSource = await fs.readFile(path.join(migrationDir, upgradeFile), 'utf8');
 const upgradeSql = [
   '-- CySec Construct — Customer Database Upgrade',
-  '-- Apply this migration when upgrading an existing schema v28 database to v29.',
+  '-- Apply this migration when upgrading an existing schema v29 database to v30.',
   '',
   `-- Internal migration: ${upgradeFile}`,
   upgradeSource.trim(),
