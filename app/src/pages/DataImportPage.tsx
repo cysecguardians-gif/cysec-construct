@@ -37,7 +37,24 @@ export default function DataImportPage({supabase,organizationId,onBack}:Props){
  async function handleFile(file?:File){if(!file)return;setBusy(true);setError('');setMessage('Reading workbook…');try{const data=await readSpreadsheet(file);if(!data.worksheets.length)throw new Error('No worksheets found in this workbook.');setBook(data);setSheet(data.worksheets[0].name);setFileName(file.name);const next:Record<string,string>={};for(const h of data.worksheets[0].headers)next[h]=guess(h,type);setMapping(next);setMessage(`${data.worksheets.length} worksheet(s) found. Select a worksheet and map its columns.`)}catch(e){setBook(null);setSheet('');setFileName('');setError(e instanceof Error?e.message:'Could not read the workbook.');setMessage('')}finally{setBusy(false)}}
  function changeType(next:ImportType){setType(next);if(next==='contractors')setUseSheetName(true);const headers=book?.worksheets.find(x=>x.name===sheet)?.headers??[];const nextMap:Record<string,string>={};headers.forEach(h=>nextMap[h]=guess(h,next));setMapping(nextMap);setError('');setMessage('')}
  function changeSheet(next:string){setSheet(next);const headers=book?.worksheets.find(x=>x.name===next)?.headers??[];const nextMap:Record<string,string>={};headers.forEach(h=>nextMap[h]=guess(h,type));setMapping(nextMap);setError('');setMessage('')}
- const validation=useMemo(()=>{const issues:string[]=[];const required=fields[type].filter(f=>f.required).map(f=>f.key);if(!preview.length)return issues;if(type==='contractors'&&useSheetName)return issues;required.forEach(key=>{if(!Object.values(mapping).includes(key))issues.push(`Map an Excel column to ${fields[type].find(f=>f.key===key)?.label??key}.`)});preview.forEach((r,i)=>required.forEach(k=>{if(!r[k]?.trim())issues.push(`Row ${i+2}: ${fields[type].find(f=>f.key===k)?.label??k} is required.`)}));preview.forEach((r,i)=>{const row=i+2;for(const k of ['quantity','gst_rate','selling_price','unit_price','amount'])if(r[k]?.trim()&&!Number.isFinite(Number(r[k])))issues.push(`Row ${row}: ${k.replaceAll('_',' ')} must be numeric.`);return [...new Set(issues)]},[preview,type,mapping]);
+ const validation=useMemo(()=>{
+  const issues:string[]=[];
+  const required=fields[type].filter(field=>field.required).map(field=>field.key);
+  if(!preview.length)return issues;
+  if(type==='contractors'&&useSheetName)return issues;
+  required.forEach(key=>{
+   if(!Object.values(mapping).includes(key))issues.push(`Map an Excel column to ${fields[type].find(field=>field.key===key)?.label??key}.`);
+  });
+  preview.forEach((row,index)=>{
+   required.forEach(key=>{
+    if(!row[key]?.trim())issues.push(`Row ${index+2}: ${fields[type].find(field=>field.key===key)?.label??key} is required.`);
+   });
+   for(const key of ['quantity','gst_rate','selling_price','unit_price','amount']){
+    if(row[key]?.trim()&&!Number.isFinite(Number(row[key])))issues.push(`Row ${index+2}: ${key.replaceAll('_',' ')} must be numeric.`);
+   }
+  });
+  return [...new Set(issues)];
+ },[preview,type,mapping,useSheetName]);
  async function importRows(){if(!preview.length||validation.length||busy||isAdmin!==true)return;setBusy(true);setError('');setMessage('Importing…');try{
   if(type==='contractors'){
    const rows=preview.filter(r=>r.name?.trim()).map(r=>({organization_id:organizationId,name:r.name.trim(),contractor_type:['contractor','subcontractor','individual'].includes((r.contractor_type||'').toLowerCase())?(r.contractor_type||'').toLowerCase():'contractor',gstin:r.gstin||null,pan:r.pan||null,contact_person:r.contact_person||null,phone:r.phone||null,email:r.email||null,address:r.address||null,state:r.state||null,state_code:r.state_code||null,notes:r.notes||null,is_active:true}));
