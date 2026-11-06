@@ -205,6 +205,27 @@ create table if not exists public.client_receipts (
     references public.contracts(organization_id, id) on delete restrict
 );
 
+-- Preserve legacy receipt metadata while aligning the columns used by the
+-- current client-receivables workflow.
+do $
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_receipts'
+      and column_name='recorded_by'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_receipts'
+      and column_name='created_by'
+  ) then
+    alter table public.client_receipts rename column recorded_by to created_by;
+  end if;
+end $;
+
+alter table public.client_receipts
+  add column if not exists receipt_number text,
+  add column if not exists created_by uuid references public.profiles(id) on delete set null;
+
 create unique index if not exists uq_client_receipts_organization_id_id
   on public.client_receipts(organization_id, id);
 
@@ -221,6 +242,28 @@ create table if not exists public.client_receipt_allocations (
   foreign key (organization_id, bill_id)
     references public.client_bills(organization_id, id) on delete restrict
 );
+
+-- Legacy receipts stored a single bill_id directly on the receipt. Convert
+-- those links into allocation rows without duplicating any existing allocation.
+do $
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema='public' and table_name='client_receipts'
+      and column_name='bill_id'
+  ) then
+    insert into public.client_receipt_allocations
+      (organization_id, receipt_id, bill_id, amount_paise)
+    select r.organization_id, r.id, r.bill_id, r.amount_paise
+    from public.client_receipts r
+    where r.bill_id is not null
+      and not exists (
+        select 1 from public.client_receipt_allocations a
+        where a.organization_id=r.organization_id
+          and a.receipt_id=r.id and a.bill_id=r.bill_id
+      );
+  end if;
+end $;
 
 create index if not exists idx_client_receipts_contract on public.client_receipts(organization_id, contract_id, receipt_date desc);
 create index if not exists idx_client_allocations_bill on public.client_receipt_allocations(organization_id, bill_id);
