@@ -55,11 +55,7 @@ begin
   from public.contractor_recovery_payments
   where organization_id=p_organization_id and settlement_id=p_settlement_id;
 
-  if v_paid+p_amount_paise=v_total and v_recovery_total <= v_recovered then
-      update public.contractor_work_orders
-      set status='settled'
-      where id=v_work_order_id and organization_id=p_organization_id;
-  elsif v_recovery_total <= v_recovered and v_status = 'paid' then
+  if v_recovery_total <= v_recovered and v_paid+p_amount_paise=v_total then
     update public.contractor_work_orders
     set status='settled'
     where id=v_work_order_id and organization_id=p_organization_id and status='under_closure';
