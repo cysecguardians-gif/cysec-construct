@@ -13,7 +13,34 @@ const monthStart = () => { const d = new Date(); d.setDate(1); return localDate(
 
 export default function StockLedgerPage({ supabase, organizationId, onBack }: Props) {
   const [movements, setMovements] = useState<Movement[]>([]); const [search, setSearch] = useState(''); const [from, setFrom] = useState(monthStart()); const [to, setTo] = useState(today()); const [type, setType] = useState('all'); const [loading, setLoading] = useState(true); const [error, setError] = useState('');
-  async function load() { setLoading(true); setError(''); const { data, error: e } = await supabase.from('construction_stock_ledger').select('id,material_id,movement_type,quantity,notes,created_at,reference_type,reference_id,material_name,selling_price_paise,unit_short_code,counterparty_name,project_name,contract_number,po_number,vendor_invoice_number').eq('organization_id', organizationId).gte('created_at', `${from}T00:00:00`).lte('created_at', `${to}T23:59:59.999`).order('created_at', { ascending: false }).limit(500); if (e) setError(e.message); else setMovements((data ?? []) as unknown as Movement[]); setLoading(false); }
+  async function load() {
+    setLoading(true);
+    setError('');
+    const pageSize = 500;
+    const rows: Movement[] = [];
+    try {
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error: queryError } = await supabase
+          .from('construction_stock_ledger')
+          .select('id,material_id,movement_type,quantity,notes,created_at,reference_type,reference_id,material_name,selling_price_paise,unit_short_code,counterparty_name,project_name,contract_number,po_number,vendor_invoice_number')
+          .eq('organization_id', organizationId)
+          .gte('created_at', `${from}T00:00:00`)
+          .lte('created_at', `${to}T23:59:59.999`)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .range(offset, offset + pageSize - 1);
+        if (queryError) throw queryError;
+        const page = (data ?? []) as unknown as Movement[];
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      setMovements(rows);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load the stock ledger.');
+    } finally {
+      setLoading(false);
+    }
+  }
   useEffect(() => { void load(); }, [organizationId, from, to]);
   const filtered = useMemo(() => movements.filter(m => (type === 'all' || m.movement_type === type) && (`${m.material_name} ${m.counterparty_name??''} ${m.project_name??''} ${m.contract_number??''} ${m.po_number??''} ${m.notes ?? ''} ${m.reference_id ?? ''}`).toLowerCase().includes(search.trim().toLowerCase())), [movements, type, search]);
   const stockInCount = filtered.filter(m => incoming.has(m.movement_type)).length; const stockOutCount = filtered.filter(m => outgoing.has(m.movement_type)).length;
