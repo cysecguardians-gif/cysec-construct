@@ -53,9 +53,9 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
       ? `RPC succeeded • authenticated=${String(appStatus.authenticated ?? 'unknown')} • schema_version=${String(appStatus.schema_version ?? 'null')}`
       : 'RPC succeeded, but returned no status object.';
 
-    if (version < 15) {
+    if (version < 16) {
       setMessage(`${responseSummary}.`);
-      setError('The database schema exists but the app did not receive schema version 15 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
+      setError('The database schema exists but the app did not receive schema version 16 from get_app_status(). This is a verification/permissions issue, not proof that the migrations are missing.');
       setBusy(false);
       return;
     }
@@ -86,15 +86,15 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
     <div className="auth-page">
       <div className="auth-card" style={{ width: 'min(700px, 100%)' }}>
         <div className="brand auth-brand">
-          <span className="brand-mark">M</span>
-          <div><strong>Material Management</strong><small>Business Edition</small></div>
+          <span className="brand-mark">CC</span>
+          <div><strong>CySec Construct</strong><small>Construction Management</small></div>
         </div>
 
         <div className="auth-copy">
           <p className="eyebrow">Database setup</p>
           <h1>Prepare your business database</h1>
           <p>
-            Your Supabase project is connected, but the Material Management System database schema has not been installed yet.
+            Your Supabase project is connected, but the CySec Construct database schema has not been installed yet.
             This is a one-time setup for this business.
           </p>
         </div>
