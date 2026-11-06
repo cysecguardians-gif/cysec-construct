@@ -35,10 +35,10 @@ export default function CustomersPage({supabase,organizationId,onBack}:{supabase
   if(editing){
    const oldCustomer=await supabase.from('customers').select('id').eq('organization_id',organizationId).ilike('name',editing.name).maybeSingle();
    if(oldCustomer.error)throw oldCustomer.error;
-   const company=await supabase.from('client_companies').update(values).eq('id',editing.id).eq('organization_id',organizationId);
-   if(company.error)throw company.error;
    if(oldCustomer.data){const updated=await supabase.rpc('update_customer',{p_customer_id:oldCustomer.data.id,p_organization_id:organizationId,p_name:form.name,...customerArgs(form)});if(updated.error)throw updated.error;}
    else {const created=await supabase.rpc('create_customer',{p_organization_id:organizationId,p_name:form.name,...customerArgs(form)});if(created.error)throw created.error;}
+   const company=await supabase.from('client_companies').update(values).eq('id',editing.id).eq('organization_id',organizationId);
+   if(company.error)throw company.error;
   }else{
    const company=await supabase.from('client_companies').upsert({organization_id:organizationId,...values},{onConflict:'organization_id,name'}).select('id').single();
    if(company.error)throw company.error;
