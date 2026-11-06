@@ -11,7 +11,6 @@ alter table public.contractor_settlements
 update public.contractor_settlements
 set recovery_status = case
   when contractor_recovery_paise <= 0 then 'not_due'
-  when status = 'paid' then 'recovered'
   else 'outstanding'
 end
 where recovery_status = 'not_due'
@@ -42,7 +41,7 @@ create policy contractor_recovery_payments_member_select
   for select to authenticated
   using (public.is_org_member(organization_id));
 grant select on public.contractor_recovery_payments to authenticated;
-revoke insert, update, delete on public.contractor_recovery_payments from anon, authenticated;
+revoke all on public.contractor_recovery_payments from anon, authenticated;
 
 
 create or replace function public.approve_contractor_settlement(
