@@ -141,6 +141,8 @@ declare
   v_recovered bigint;
   v_id uuid;
   v_status text;
+  v_final_payable bigint;
+  v_paid bigint;
 begin
   if not public.is_org_admin(p_organization_id) then
     raise exception 'administrator_required_to_record_contractor_recovery';
@@ -149,8 +151,8 @@ begin
     raise exception 'recovery_amount_must_be_positive';
   end if;
 
-  select work_order_id, contractor_recovery_paise, status
-    into v_work_order_id, v_recovery_total, v_status
+  select work_order_id, contractor_recovery_paise, status, final_payable_paise
+    into v_work_order_id, v_recovery_total, v_status, v_final_payable
   from public.contractor_settlements
   where id = p_settlement_id
     and organization_id = p_organization_id
@@ -194,12 +196,20 @@ begin
   where id = p_settlement_id
     and organization_id = p_organization_id;
 
-  if v_recovered = v_recovery_total then
-    update public.contractor_work_orders
-    set status = 'settled'
-    where id = v_work_order_id
-      and organization_id = p_organization_id
-      and status = 'under_closure';
+  if v_recovered = v_recovery_total and v_status = 'paid' then
+    select coalesce(sum(amount_paise),0)::bigint
+      into v_paid
+    from public.contractor_settlement_payments
+    where organization_id = p_organization_id
+      and settlement_id = p_settlement_id;
+
+    if v_paid >= v_final_payable then
+      update public.contractor_work_orders
+      set status = 'settled'
+      where id = v_work_order_id
+        and organization_id = p_organization_id
+        and status = 'under_closure';
+    end if;
   end if;
 
   insert into public.audit_log(
