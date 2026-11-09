@@ -4,6 +4,24 @@
 
 begin;
 
+-- Bring older/fresh schemas to the canonical contractor return shape before
+-- defining the RPC. All additions are nullable or safely defaulted so existing
+-- customer records remain intact.
+alter table public.material_issues
+  add column if not exists contractor_id uuid;
+
+alter table public.material_returns
+  add column if not exists issue_id uuid,
+  add column if not exists contractor_id uuid,
+  add column if not exists project_id uuid;
+
+alter table public.material_return_items
+  add column if not exists condition text not null default 'usable',
+  add column if not exists notes text;
+
+alter table public.contractor_advances
+  add column if not exists contractor_id uuid;
+
 alter table public.material_returns
   alter column project_id drop not null;
 
