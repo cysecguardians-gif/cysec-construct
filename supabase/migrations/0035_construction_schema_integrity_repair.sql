@@ -53,7 +53,6 @@ from (
   having count(distinct ii.issue_id) = 1
 ) src
 where src.return_id = mr.id
-  and mr.organization_id = mr.organization_id
   and mr.issue_id is null;
 
 alter table public.material_return_items
