@@ -8,6 +8,7 @@ const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maxim
 const paise=(v:string)=>Math.round((Number(v)||0)*100);
 const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 export default function ConstructionMaterialsPage({supabase,organizationId,onBack,onInventory,onLedger}:Props){
+ const [activeTab,setActiveTab]=useState('purchase');
  const [vendors,setVendors]=useState<Vendor[]>([]),[materials,setMaterials]=useState<Material[]>([]),[purchases,setPurchases]=useState<Purchase[]>([]);
  const [vendorName,setVendorName]=useState(''),[vendorGstin,setVendorGstin]=useState(''),[vendorPhone,setVendorPhone]=useState('');
  const [vendorId,setVendorId]=useState(''),[purchaseDate,setPurchaseDate]=useState(localDate(new Date())),[materialId,setMaterialId]=useState(''),[purchaseNo,setPurchaseNo]=useState(''),[vendorInvoice,setVendorInvoice]=useState(''),[quantity,setQuantity]=useState(''),[rate,setRate]=useState(''),[gst,setGst]=useState('0'),[other,setOther]=useState('0');
