@@ -124,3 +124,11 @@ button.secondary{border:1px solid #d6dce5;border-radius:9px;padding:10px 14px;ba
   align-content: start;
   grid-auto-rows: max-content;
 }
+
+
+/* Tabbed workspaces for procurement and contractor operations */
+.workspace-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 20px;padding:6px;background:#e9edf3;border:1px solid #dce3ec;border-radius:12px;}
+.workspace-tabs button{flex:0 0 auto;min-height:40px;padding:9px 16px;border:1px solid transparent;border-radius:8px;background:transparent;color:#526176;font-size:13px;font-weight:650;cursor:pointer;}
+.workspace-tabs button:hover{background:#f8fafc;color:#172033;}
+.workspace-tabs button.active{background:#172033;border-color:#172033;color:#fff;box-shadow:0 1px 2px rgba(15,23,42,.12);}
+@media(max-width:700px){.workspace-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}.workspace-tabs button{width:100%;}}
