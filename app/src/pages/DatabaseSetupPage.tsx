@@ -143,7 +143,7 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
                 <li>Click <strong>Copy database setup SQL</strong>.</li>
                 <li>Open the Supabase SQL Editor for this business.</li>
                 <li>Paste the SQL and click <strong>Run</strong>.</li>
-                <li>Return here and click <strong>Verify database setup</strong>.</li>
+                <li>Return here and click <strong>Verify database setup</strong>. The app will then prompt you to create the first administrator before authenticated verification.</li>
               </ol>
             </>}
           </div>
