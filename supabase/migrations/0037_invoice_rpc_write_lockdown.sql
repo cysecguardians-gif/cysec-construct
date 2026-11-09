@@ -41,4 +41,8 @@ insert into public.app_schema_version(version)
 values (37)
 on conflict (version) do nothing;
 
+insert into public.app_schema_migrations(migration_name, migration_number)
+values ('0037_invoice_rpc_write_lockdown.sql', 37)
+on conflict (migration_name) do nothing;
+
 commit;
