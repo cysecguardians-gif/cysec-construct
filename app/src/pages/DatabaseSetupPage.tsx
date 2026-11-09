@@ -51,6 +51,20 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
         details: rpcError.details,
         hint: rpcError.hint,
       });
+
+      // A locally cached session can exist even when Supabase no longer
+      // recognizes its JWT. P0001/authentication_required means this is not
+      // a schema failure: clear that stale session and resume first-run
+      // onboarding, where get_setup_status determines whether to create
+      // the first administrator or sign in an existing one.
+      if (rpcError.code === 'P0001' && /authentication_required/i.test(rpcError.message)) {
+        await supabase.auth.signOut();
+        setMessage('No valid administrator session is active. Continuing to administrator setup…');
+        setBusy(false);
+        onReady();
+        return;
+      }
+
       setMessage('Database verification RPC failed.');
       if (rpcError.code === 'PGRST202' || rpcError.code === 'PGRST205') {
         setError('Install the database setup SQL below in this Supabase project, then click Verify database setup.');
