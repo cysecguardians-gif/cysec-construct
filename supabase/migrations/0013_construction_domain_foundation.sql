@@ -449,12 +449,17 @@ create table if not exists public.material_purchase_items (
   organization_id uuid not null references public.organizations(id) on delete cascade,
   purchase_id uuid not null,
   material_id uuid not null,
-  material_name_snapshot text not null,
+  -- Legacy columns remain nullable for compatibility with the original receive RPC.
+  material_name_snapshot text,
+  description_snapshot text,
   unit_name_snapshot text,
   quantity numeric(14,3) not null check (quantity > 0),
-  unit_purchase_price_paise bigint not null check (unit_purchase_price_paise >= 0),
+  unit_purchase_price_paise bigint check (unit_purchase_price_paise >= 0),
+  unit_cost_paise bigint not null default 0 check (unit_cost_paise >= 0),
   gst_rate numeric(5,2) not null default 0 check (gst_rate between 0 and 100),
-  line_total_paise bigint not null check (line_total_paise >= 0),
+  line_total_paise bigint check (line_total_paise >= 0),
+  line_subtotal_paise bigint not null default 0 check (line_subtotal_paise >= 0),
+  line_gst_paise bigint not null default 0 check (line_gst_paise >= 0),
   created_at timestamptz not null default now(),
   foreign key (organization_id, purchase_id)
     references public.material_purchases(organization_id, id) on delete restrict,
@@ -684,10 +689,11 @@ create table if not exists public.material_issues (
   organization_id uuid not null references public.organizations(id) on delete cascade,
   issue_number text not null,
   work_order_id uuid not null,
+  contractor_id uuid,
   project_id uuid,
   issue_date date not null default current_date,
   notes text,
-  status text not null default 'issued' check (status in ('issued','cancelled')),
+  status text not null default 'issued' check (status in ('issued','partially_returned','cancelled')),
   issued_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   unique (organization_id, id),
@@ -750,7 +756,10 @@ create table if not exists public.material_returns (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   return_number text not null,
+  issue_id uuid,
   work_order_id uuid not null,
+  contractor_id uuid,
+  project_id uuid,
   return_date date not null default current_date,
   notes text,
   received_by uuid references public.profiles(id) on delete set null,
@@ -768,6 +777,8 @@ create table if not exists public.material_return_items (
   issue_item_id uuid not null,
   material_id uuid not null,
   quantity_returned numeric(14,3) not null check (quantity_returned > 0),
+  condition text not null default 'usable' check (condition in ('usable','damaged','scrap')),
+  notes text,
   created_at timestamptz not null default now(),
   foreign key (organization_id, return_id)
     references public.material_returns(organization_id, id) on delete restrict,
@@ -785,6 +796,7 @@ create table if not exists public.contractor_advances (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid not null references public.organizations(id) on delete cascade,
   work_order_id uuid not null,
+  contractor_id uuid,
   advance_date date not null default current_date,
   amount_paise bigint not null check (amount_paise > 0),
   payment_method public.payment_method not null default 'cash',
@@ -840,7 +852,7 @@ select
   ii.contractor_unit_rate_paise,
   greatest(ii.quantity_issued - coalesce(r.returned_quantity, 0), 0)::numeric(14,3) * ii.contractor_unit_rate_paise as material_charge_paise
 from public.material_issue_items ii
-join public.material_issues mi on mi.id=ii.issue_id and mi.organization_id=ii.organization_id and mi.status='issued'
+join public.material_issues mi on mi.id=ii.issue_id and mi.organization_id=ii.organization_id and mi.status in ('issued','partially_returned')
 join public.contractor_work_orders wo on wo.id=mi.work_order_id and wo.organization_id=ii.organization_id
 left join (
   select organization_id, issue_item_id, sum(quantity_returned) returned_quantity
