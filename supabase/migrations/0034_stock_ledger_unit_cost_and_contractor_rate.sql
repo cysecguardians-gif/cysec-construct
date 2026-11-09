@@ -26,7 +26,7 @@ select
   mp.vendor_invoice_number,
   case
     when sm.reference_type = 'material_purchase' then (
-      select mpi.unit_cost_paise
+      select mpi.unit_purchase_price_paise
       from public.material_purchase_items mpi
       where mpi.organization_id = sm.organization_id
         and mpi.purchase_id = sm.reference_id
