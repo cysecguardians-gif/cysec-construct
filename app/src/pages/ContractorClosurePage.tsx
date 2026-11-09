@@ -23,6 +23,7 @@ export default function ContractorClosurePage({supabase,organizationId,onBack}:P
   supabase.from('contractor_recovery_payments').select('id,settlement_id,recovery_date,amount_paise,payment_method,reference_number').eq('organization_id',organizationId).order('recovery_date',{ascending:false})
  ]);const e=w.error||c.error||l.error||s.error||r.error;if(e){setError(e.message);return}setOrders(w.data??[]);setContractors(c.data??[]);setLines(l.data??[]);setSettlements(s.data??[]);setRecoveryPayments(r.data??[]);if(!selected&&w.data?.[0])setSelected(w.data[0].id);}
  useEffect(()=>{void load()},[organizationId]);
+ useEffect(()=>{setFinalCheckConfirmed(false);setFinalReturnQty({});setFinalReturnCondition({});setFinalReturnNumber('');},[selected]);
  const current=orders.find(x=>x.id===selected),currentLines=useMemo(()=>lines.filter(x=>x.work_order_id===selected),[lines,selected]),currentSettlement=settlements.find(x=>x.work_order_id===selected);
  async function action(fn:()=>PromiseLike<{error:any}>,ok:string):Promise<boolean>{setBusy(true);setError('');setNotice('');try{const r=await fn();if(r.error){setError(r.error.message);return false}setNotice(ok);await load();return true}catch(e){setError(e instanceof Error?e.message:'The operation failed. Please try again.');return false}finally{setBusy(false)}}
  async function complete(){if(!selected)return;await action(()=>supabase.rpc('complete_contractor_work_order',{p_organization_id:organizationId,p_work_order_id:selected,p_actual_completion_date:completionDate}),'PO marked completed.')}
