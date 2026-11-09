@@ -162,6 +162,26 @@ alter table public.material_issues
   add constraint material_issues_status_check
   check (status in ('issued','partially_returned','cancelled'));
 
+do $migration$
+declare
+  c record;
+begin
+  for c in
+    select conname
+    from pg_constraint
+    where conrelid = 'public.material_return_items'::regclass
+      and contype = 'c'
+      and pg_get_constraintdef(oid) ilike '%condition%'
+  loop
+    execute format('alter table public.material_return_items drop constraint %I', c.conname);
+  end loop;
+end
+$migration$;
+
+alter table public.material_return_items
+  add constraint material_return_items_condition_check
+  check (condition in ('usable','damaged','scrap'));
+
 -- Add tenant-scoped foreign keys only when absent.
 do $migration$
 begin
