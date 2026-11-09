@@ -32,8 +32,7 @@ where wo.id = mr.work_order_id
   and (mr.contractor_id is null or mr.project_id is null);
 
 update public.material_returns mr
-set issue_id = src.id
-from lateral (
+set issue_id = (
   select mi.id
   from public.material_issues mi
   where mi.organization_id = mr.organization_id
@@ -41,7 +40,7 @@ from lateral (
     and mi.status <> 'cancelled'
   order by mi.created_at desc
   limit 1
-) src
+)
 where mr.issue_id is null;
 
 alter table public.material_return_items
