@@ -5,6 +5,12 @@
 
 begin;
 
+create table if not exists public.app_schema_migrations (
+  migration_name text primary key,
+  migration_number integer not null,
+  applied_at timestamptz not null default now()
+);
+
 -- Contractor material issues.
 alter table public.material_issues
   add column if not exists contractor_id uuid;
@@ -231,5 +237,9 @@ left join public.material_reconciliations mc
 insert into public.app_schema_version(version)
 values (35)
 on conflict (version) do nothing;
+
+insert into public.app_schema_migrations(migration_name, migration_number)
+values ('0035_construction_schema_integrity_repair.sql', 35)
+on conflict (migration_name) do nothing;
 
 commit;
