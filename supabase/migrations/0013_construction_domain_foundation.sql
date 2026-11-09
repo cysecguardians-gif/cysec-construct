@@ -798,7 +798,7 @@ select
   wo.id as work_order_id,
   ii.id as issue_item_id,
   ii.material_id,
-  ii.description_snapshot as material_name_snapshot,
+  ii.material_name_snapshot,
   ii.unit_name_snapshot,
   ii.quantity_issued,
   coalesce(r.returned_quantity, 0)::numeric(14,3) as quantity_returned,
