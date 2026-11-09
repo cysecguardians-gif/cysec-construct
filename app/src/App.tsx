@@ -36,7 +36,12 @@ export default function App(){
 
  useEffect(()=>{if(!supabase)return;let mounted=true;
    const {data:l}=supabase.auth.onAuthStateChange((event,s)=>{sessionRef.current=s;setSession(s);if(!s&&loginSessionIdRef.current){void endLoginSession(supabase,loginSessionIdRef.current,'auth_signed_out');loginSessionIdRef.current=null;}if(event==='SIGNED_IN'&&s){setScreen(prev=>prev==='database-setup'?'database-setup':prev==='organization'?'organization':'dashboard');}else if(event==='SIGNED_OUT'&&!s&&setupChecked){setOrganizationId(null);setInvoiceId(null);setScreen(prev=>prev==='admin-setup'?'admin-setup':'login');}});
-   (async()=>{const [{data,error:e},{data:setup,error:se}]=await Promise.all([supabase.auth.getSession(),supabase.rpc('get_setup_status')]);if(!mounted)return;if(e){setError(e.message);return;}if(se&&(se.code==='PGRST202'||se.code==='PGRST205')){setSetupChecked(false);setScreen('database-setup');return;}if(se){setError(se.message);return;}const s=setup as SetupStatus;setSetupChecked(true);if(data.session){sessionRef.current=data.session;setSession(data.session);setScreen('dashboard');}else{setSession(null);setScreen(s.admin_exists?'login':'admin-setup');}})();
+   (async()=>{const {data,error:e}=await supabase.auth.getSession();if(!mounted)return;if(e){setError(e.message);return;}if(data.session){sessionRef.current=data.session;setSession(data.session);setSetupChecked(true);setScreen('dashboard');return;}setSession(null);
+     const {data:setup,error:se}=await supabase.rpc('get_setup_status');if(!mounted)return;
+     if(se&&(se.code==='PGRST202'||se.code==='PGRST205')){setSetupChecked(false);setScreen('database-setup');return;}
+     if(se){setError(se.message);return;}
+     const status=setup as SetupStatus;setSetupChecked(true);setScreen(status.admin_exists?'login':'admin-setup');
+   })();
    return()=>{mounted=false;l.subscription.unsubscribe();};
  },[supabase]);
 
