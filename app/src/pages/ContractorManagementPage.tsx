@@ -14,6 +14,7 @@ const paise=(v:string)=>Math.round((Number(v)||0)*100);
 const localDate=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 type Props={supabase:SupabaseClient;organizationId:string;onBack:()=>void};
 export default function ContractorManagementPage({supabase,organizationId,onBack}:Props){
+ const [activeTab,setActiveTab]=useState('contractors');
  const [contractors,setContractors]=useState<Contractor[]>([]),[contracts,setContracts]=useState<Contract[]>([]),[projects,setProjects]=useState<Project[]>([]),[materials,setMaterials]=useState<Material[]>([]),[orders,setOrders]=useState<WorkOrder[]>([]),[issueLines,setIssueLines]=useState<IssueLine[]>([]);
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
  const [poDate,setPoDate]=useState(localDate(new Date())),[advanceDate,setAdvanceDate]=useState(localDate(new Date())),[issueDate,setIssueDate]=useState(localDate(new Date())),[returnDate,setReturnDate]=useState(localDate(new Date()));
