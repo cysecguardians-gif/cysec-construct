@@ -296,4 +296,8 @@ begin
 end;
 $$;
 
+insert into public.app_schema_version(version)
+values (36)
+on conflict (version) do nothing;
+
 commit;
