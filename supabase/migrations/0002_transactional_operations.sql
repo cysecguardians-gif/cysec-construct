@@ -273,10 +273,10 @@ begin
   if p_discount_enabled then
     v_taxable := greatest(v_taxable - v_discount, 0);
     if p_gst_enabled then
+      -- Reset all tax aggregates before recalculating either intra-state or
+      -- inter-state GST on the discounted taxable base.
+      v_cgst := 0; v_sgst := 0; v_igst := 0;
       if v_same_state then
-        v_cgst := round(v_taxable * (coalesce((select avg(gst_rate) from public.materials where organization_id = p_organization_id and false), 0)) / 200);
-        -- Reset below using weighted GST from item values instead of avg rate.
-        v_cgst := 0; v_sgst := 0; v_igst := 0;
         for v_item in select value from jsonb_array_elements(p_items) loop
           select * into v_material from public.materials where id = (v_item->>'material_id')::uuid and organization_id = p_organization_id;
           v_qty := (v_item->>'quantity')::numeric;
