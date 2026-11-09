@@ -29,6 +29,20 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
     setError('');
     setMessage('Checking database schema…');
 
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) {
+      setMessage('Could not check the current administrator session.');
+      setError(`Authentication check failed: ${sessionError.message}`);
+      setBusy(false);
+      return;
+    }
+    if (!sessionData.session) {
+      setMessage('Database schema installed. Administrator setup is the next step.');
+      setBusy(false);
+      onReady();
+      return;
+    }
+
     const { data, error: rpcError } = await supabase.rpc('get_app_status');
     if (rpcError) {
       console.error('Database verification RPC failed:', {
@@ -59,6 +73,13 @@ export default function DatabaseSetupPage({ supabase, error: initialError, onRea
     if (version < 26) {
       setMessage(`${responseSummary}.`);
       setError('Schema version 25 detected. Apply the targeted migration 0026 using the upgrade SQL below, then verify again.');
+      setBusy(false);
+      return;
+    }
+
+    if (appStatus?.authenticated === false) {
+      setMessage(`${responseSummary}. Sign in as the administrator to complete verification.`);
+      setError('The database status function did not receive the authenticated administrator session. Sign in, then verify again.');
       setBusy(false);
       return;
     }
