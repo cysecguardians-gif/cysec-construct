@@ -300,4 +300,8 @@ insert into public.app_schema_version(version)
 values (36)
 on conflict (version) do nothing;
 
+insert into public.app_schema_migrations(migration_name, migration_number)
+values ('0036_invoice_igst_discount_recalculation.sql', 36)
+on conflict (migration_name) do nothing;
+
 commit;
