@@ -700,6 +700,8 @@ create table if not exists public.material_issues (
   unique (organization_id, issue_number),
   foreign key (organization_id, work_order_id)
     references public.contractor_work_orders(organization_id, id) on delete restrict,
+  foreign key (organization_id, contractor_id)
+    references public.contractors(organization_id, id) on delete restrict,
   foreign key (organization_id, project_id)
     references public.projects(organization_id, id) on delete restrict
 );
@@ -766,8 +768,14 @@ create table if not exists public.material_returns (
   created_at timestamptz not null default now(),
   unique (organization_id, id),
   unique (organization_id, return_number),
+  foreign key (organization_id, issue_id)
+    references public.material_issues(organization_id, id) on delete restrict,
   foreign key (organization_id, work_order_id)
-    references public.contractor_work_orders(organization_id, id) on delete restrict
+    references public.contractor_work_orders(organization_id, id) on delete restrict,
+  foreign key (organization_id, contractor_id)
+    references public.contractors(organization_id, id) on delete restrict,
+  foreign key (organization_id, project_id)
+    references public.projects(organization_id, id) on delete restrict
 );
 
 create table if not exists public.material_return_items (
@@ -806,7 +814,9 @@ create table if not exists public.contractor_advances (
   created_at timestamptz not null default now(),
   unique (organization_id, id),
   foreign key (organization_id, work_order_id)
-    references public.contractor_work_orders(organization_id, id) on delete restrict
+    references public.contractor_work_orders(organization_id, id) on delete restrict,
+  foreign key (organization_id, contractor_id)
+    references public.contractors(organization_id, id) on delete restrict
 );
 
 create index if not exists idx_contractor_advances_work_order on public.contractor_advances(organization_id, work_order_id, advance_date desc);
