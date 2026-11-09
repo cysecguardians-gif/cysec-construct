@@ -4,6 +4,38 @@
 
 begin;
 
+-- Older customer databases created material_returns before the contractor
+-- return workflow required these source and ownership references. Add them
+-- before the RPC below uses them. Keep them nullable for legacy return rows.
+alter table public.material_returns
+  add column if not exists issue_id uuid,
+  add column if not exists contractor_id uuid,
+  add column if not exists project_id uuid;
+
+-- Add tenant-scoped foreign keys only when they are not already present.
+do $migration$
+begin
+  if not exists (select 1 from pg_constraint where conrelid='public.material_returns'::regclass and conname='material_returns_organization_issue_fk') then
+    alter table public.material_returns
+      add constraint material_returns_organization_issue_fk
+      foreign key (organization_id, issue_id)
+      references public.material_issues(organization_id, id) on delete restrict;
+  end if;
+  if not exists (select 1 from pg_constraint where conrelid='public.material_returns'::regclass and conname='material_returns_organization_contractor_fk') then
+    alter table public.material_returns
+      add constraint material_returns_organization_contractor_fk
+      foreign key (organization_id, contractor_id)
+      references public.contractors(organization_id, id) on delete restrict;
+  end if;
+  if not exists (select 1 from pg_constraint where conrelid='public.material_returns'::regclass and conname='material_returns_organization_project_fk') then
+    alter table public.material_returns
+      add constraint material_returns_organization_project_fk
+      foreign key (organization_id, project_id)
+      references public.projects(organization_id, id) on delete restrict;
+  end if;
+end
+$migration$;
+
 alter table public.material_returns
   alter column project_id drop not null;
 
