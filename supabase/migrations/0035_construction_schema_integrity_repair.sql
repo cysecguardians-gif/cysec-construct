@@ -37,17 +37,24 @@ where wo.id = mr.work_order_id
   and wo.organization_id = mr.organization_id
   and (mr.contractor_id is null or mr.project_id is null);
 
+-- Only backfill the source issue when every historical return line points
+-- to the same issue. Leave ambiguous legacy headers NULL rather than guessing.
 update public.material_returns mr
-set issue_id = (
-  select mi.id
-  from public.material_issues mi
-  where mi.organization_id = mr.organization_id
-    and mi.work_order_id = mr.work_order_id
-    and mi.status <> 'cancelled'
-  order by mi.created_at desc
-  limit 1
-)
-where mr.issue_id is null;
+set issue_id = src.issue_id
+from (
+  select
+    ri.return_id,
+    (array_agg(distinct ii.issue_id))[1] as issue_id
+  from public.material_return_items ri
+  join public.material_issue_items ii
+    on ii.id = ri.issue_item_id
+   and ii.organization_id = ri.organization_id
+  group by ri.return_id
+  having count(distinct ii.issue_id) = 1
+) src
+where src.return_id = mr.id
+  and mr.organization_id = mr.organization_id
+  and mr.issue_id is null;
 
 alter table public.material_return_items
   add column if not exists condition text not null default 'usable',
