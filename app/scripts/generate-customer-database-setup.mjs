@@ -14,7 +14,7 @@ const migrationFiles = (await fs.readdir(migrationDir))
 const sections = [];
 for (const file of migrationFiles) {
   const source = await fs.readFile(path.join(migrationDir, file), 'utf8');
-  const migrationNumber = Number.parseInt(file.match(/^\\d+/)?.[0] ?? '0', 10);
+  const migrationNumber = Number.parseInt(file.match(/^\d+/)?.[0] ?? '0', 10);
   sections.push(`-- CySec Construct database setup\n-- Internal migration: ${file}\n-- This file is bundled into the desktop application for customer database initialization.\n\n${source.trim()}\n\ninsert into public.app_schema_migrations(migration_name, migration_number)\nvalues ('${file.replaceAll("'", "''")}', ${migrationNumber})\non conflict (migration_name) do nothing;`);
 }
 
