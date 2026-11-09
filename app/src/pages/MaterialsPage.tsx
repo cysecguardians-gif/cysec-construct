@@ -149,7 +149,7 @@ export default function MaterialsPage({ supabase, organizationId, onBack }: Prop
   );
 }
 
-function MaterialForm({ material, units, categories, onCancel, onSave }: { material: Material | null; units: Unit[]; categories: Category[]; onCancel: () => void; onSave: (values: { name: string; description: string; hsn: string; gst: string; price: string; quantity: string; minimumStock: string; unitId: string; categoryId: string }) => Promise<void> }) {
+function MaterialForm({ material, units, categories, onCancel, onSave }: { material: Material | null; units: Unit[]; categories: Category[]; onCancel: () => void; onSave: (values: { name: string; description: string; gst: string; price: string; quantity: string; minimumStock: string; unitId: string; categoryId: string }) => Promise<void> }) {
   const [form, setForm] = useState({ name: material?.name ?? '', description: material?.description ?? '', gst: String(material?.gst_rate ?? 0), price: material ? String(Number(material.selling_price_paise) / 100) : '', quantity: '', minimumStock: String(material?.minimum_stock_quantity ?? ''), unitId: material?.unit_id ?? '', categoryId: material?.category_id ?? '' });
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) { e.preventDefault(); setBusy(true); setError(''); try { await onSave(form); } catch (err) { setError(err instanceof Error ? err.message : 'Could not save material.'); } finally { setBusy(false); } }
