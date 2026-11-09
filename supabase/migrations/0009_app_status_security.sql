@@ -22,12 +22,18 @@ security definer
 set search_path = public
 as $$
 begin
-  -- Database setup verification runs before the first administrator exists.
-  -- This endpoint exposes only non-sensitive schema metadata, so it must work
-  -- for the anon client as well as authenticated users.
+  -- Verification is intentionally authenticated. The first-run application
+  -- flow installs the schema, creates/signs in the first administrator, and
+  -- only then invokes this function. Do not expose schema metadata anonymously.
+  if auth.uid() is null then
+    raise exception using
+      errcode = 'P0001',
+      message = 'authentication_required';
+  end if;
+
   return jsonb_build_object(
     'ok', true,
-    'authenticated', auth.uid() is not null,
+    'authenticated', true,
     'schema_version', (select max(version) from public.app_schema_version),
     'currency_code', 'INR',
     'locale', 'en-IN'
@@ -36,6 +42,7 @@ end;
 $$;
 
 revoke execute on function public.get_app_status() from public;
-grant execute on function public.get_app_status() to anon, authenticated;
+revoke execute on function public.get_app_status() from anon;
+grant execute on function public.get_app_status() to authenticated;
 
 commit;
