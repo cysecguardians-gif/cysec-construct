@@ -5,6 +5,28 @@
 
 begin;
 
+-- Normalize the fresh-install snapshot column to the name used by the
+-- corrected contractor issue RPC below. Existing customer databases that
+-- already have description_snapshot are left unchanged.
+do $migration$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'material_issue_items'
+      and column_name = 'material_name_snapshot'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'material_issue_items'
+      and column_name = 'description_snapshot'
+  ) then
+    alter table public.material_issue_items
+      rename column material_name_snapshot to description_snapshot;
+  end if;
+end
+$migration$;
+
 alter table public.material_issues
   alter column project_id drop not null;
 
