@@ -22,13 +22,12 @@ security definer
 set search_path = public
 as $$
 begin
-  if auth.uid() is null then
-    raise exception 'authentication_required';
-  end if;
-
+  -- Database setup verification runs before the first administrator exists.
+  -- This endpoint exposes only non-sensitive schema metadata, so it must work
+  -- for the anon client as well as authenticated users.
   return jsonb_build_object(
     'ok', true,
-    'authenticated', true,
+    'authenticated', auth.uid() is not null,
     'schema_version', (select max(version) from public.app_schema_version),
     'currency_code', 'INR',
     'locale', 'en-IN'
@@ -37,6 +36,6 @@ end;
 $$;
 
 revoke execute on function public.get_app_status() from public;
-grant execute on function public.get_app_status() to authenticated;
+grant execute on function public.get_app_status() to anon, authenticated;
 
 commit;
