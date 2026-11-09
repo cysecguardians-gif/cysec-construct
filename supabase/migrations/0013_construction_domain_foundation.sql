@@ -684,6 +684,7 @@ create table if not exists public.material_issues (
   organization_id uuid not null references public.organizations(id) on delete cascade,
   issue_number text not null,
   work_order_id uuid not null,
+  project_id uuid,
   issue_date date not null default current_date,
   notes text,
   status text not null default 'issued' check (status in ('issued','cancelled')),
@@ -692,8 +693,40 @@ create table if not exists public.material_issues (
   unique (organization_id, id),
   unique (organization_id, issue_number),
   foreign key (organization_id, work_order_id)
-    references public.contractor_work_orders(organization_id, id) on delete restrict
+    references public.contractor_work_orders(organization_id, id) on delete restrict,
+  foreign key (organization_id, project_id)
+    references public.projects(organization_id, id) on delete restrict
 );
+
+-- Keep material_issues compatible with the project-scoped issue workflow.
+-- The project is nullable because contract-level work orders may not belong
+-- to a specific project. Backfill it from the linked work order where possible.
+alter table public.material_issues
+  add column if not exists project_id uuid;
+
+update public.material_issues mi
+set project_id = wo.project_id
+from public.contractor_work_orders wo
+where wo.id = mi.work_order_id
+  and wo.organization_id = mi.organization_id
+  and mi.project_id is null;
+
+do $migration$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'material_issues_organization_project_fk'
+      and conrelid = 'public.material_issues'::regclass
+  ) then
+    alter table public.material_issues
+      add constraint material_issues_organization_project_fk
+      foreign key (organization_id, project_id)
+      references public.projects(organization_id, id) on delete restrict;
+  end if;
+end $migration$;
+
+create index if not exists idx_material_issues_project
+  on public.material_issues(organization_id, project_id, issue_date desc);
 
 create table if not exists public.material_issue_items (
   id uuid primary key default gen_random_uuid(),
