@@ -53,7 +53,7 @@ begin
     if v_qty::text in ('NaN','Infinity','-Infinity')
        or v_price::text in ('NaN','Infinity','-Infinity')
        or v_gst::text in ('NaN','Infinity','-Infinity')
-       or v_qty <> 0 or v_price < 0 or v_gst < 0 or v_gst > 100 then
+       or v_qty < 0 or v_price < 0 or v_gst < 0 or v_gst > 100 then
       raise exception 'invalid_material_numeric_value';
     end if;
 
