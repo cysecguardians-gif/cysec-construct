@@ -198,7 +198,7 @@ begin
   );
   v_same_state:=coalesce(nullif(trim(p_place_of_supply_state_code),''),v_customer.billing_state_code)=v_org_state_code;
 
-  foreach v_item in array (select array_agg(value) from jsonb_array_elements(p_items)) loop
+  for v_item in select value from jsonb_array_elements(p_items) loop
     v_description:=nullif(trim(v_item->>'description'),'');
     v_hsn:=nullif(trim(v_item->>'hsn_sac_code'),'');
     v_unit:=nullif(trim(v_item->>'unit_name'),'');
