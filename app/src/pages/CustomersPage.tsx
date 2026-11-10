@@ -12,13 +12,12 @@ export default function CustomersPage({supabase,organizationId,onBack}:{supabase
  const [clients,setClients]=useState<Client[]>([]),[balances,setBalances]=useState<Record<string,Balance>>({}),[search,setSearch]=useState(''),[busy,setBusy]=useState(true),[error,setError]=useState(''),[editing,setEditing]=useState<Client|null>(null),[showForm,setShowForm]=useState(false),[selected,setSelected]=useState<Client|null>(null);
  async function load(){
   setBusy(true);setError('');
-  const [companies,customers,summary]=await Promise.all([
+  const [companies,summary]=await Promise.all([
    supabase.from('client_companies').select('id,customer_id,name,gstin,pan,phone,email,billing_address_line1:address_line1,billing_address_line2:address_line2,billing_city:city,billing_state:state,billing_state_code:state_code,billing_postal_code:postal_code,is_active').eq('organization_id',organizationId).order('name'),
-   Promise.resolve({data:[],error:null} as any),
    supabase.from('customer_balance_summary').select('customer_id,total_invoiced_paise,total_paid_paise,total_pending_paise').eq('organization_id',organizationId)
   ]);
   setBusy(false);
-  const failure=companies.error||customers.error||summary.error;
+  const failure=companies.error||summary.error;
   if(failure){setError(failure.message);return;}
   const balanceByCustomer=new Map((summary.data??[]).map((b:any)=>[b.customer_id,b as Balance]));
   const mapped=(companies.data??[]).map((company:any)=>({...company,shipping_address_line1:null,shipping_address_line2:null,shipping_city:null,shipping_state:null,shipping_state_code:null,shipping_postal_code:null})) as Client[];
