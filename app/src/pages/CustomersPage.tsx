@@ -1,31 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-type Client = { id:string; name:string; gstin:string|null; pan:string|null; phone:string|null; email:string|null; billing_address_line1:string|null; billing_address_line2:string|null; billing_city:string|null; billing_state:string|null; billing_state_code:string|null; billing_postal_code:string|null; shipping_address_line1:string|null; shipping_address_line2:string|null; shipping_city:string|null; shipping_state:string|null; shipping_state_code:string|null; shipping_postal_code:string|null; is_active:boolean };
+type Client = { id:string; customer_id:string|null; name:string; gstin:string|null; pan:string|null; phone:string|null; email:string|null; billing_address_line1:string|null; billing_address_line2:string|null; billing_city:string|null; billing_state:string|null; billing_state_code:string|null; billing_postal_code:string|null; shipping_address_line1:string|null; shipping_address_line2:string|null; shipping_city:string|null; shipping_state:string|null; shipping_state_code:string|null; shipping_postal_code:string|null; is_active:boolean };
 type Balance = { total_invoiced_paise:number; total_paid_paise:number; total_pending_paise:number };
 type Form = Record<'name'|'gstin'|'pan'|'phone'|'email'|'billing_address_line1'|'billing_address_line2'|'billing_city'|'billing_state'|'billing_state_code'|'billing_postal_code'|'shipping_address_line1'|'shipping_address_line2'|'shipping_city'|'shipping_state'|'shipping_state_code'|'shipping_postal_code',string>;
 const emptyForm:Form={name:'',gstin:'',pan:'',phone:'',email:'',billing_address_line1:'',billing_address_line2:'',billing_city:'',billing_state:'',billing_state_code:'',billing_postal_code:'',shipping_address_line1:'',shipping_address_line2:'',shipping_city:'',shipping_state:'',shipping_state_code:'',shipping_postal_code:''};
 const money=new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:2});
 const states=['Andhra Pradesh','Arunachal Pradesh','Assam','Bihar','Chhattisgarh','Delhi','Goa','Gujarat','Haryana','Himachal Pradesh','Jharkhand','Karnataka','Kerala','Madhya Pradesh','Maharashtra','Odisha','Punjab','Rajasthan','Tamil Nadu','Telangana','Uttar Pradesh','Uttarakhand','West Bengal'];
-const normalize=(value:string)=>value.trim().toLowerCase();
 
 export default function CustomersPage({supabase,organizationId,onBack}:{supabase:SupabaseClient;organizationId:string;onBack:()=>void}){
  const [clients,setClients]=useState<Client[]>([]),[balances,setBalances]=useState<Record<string,Balance>>({}),[search,setSearch]=useState(''),[busy,setBusy]=useState(true),[error,setError]=useState(''),[editing,setEditing]=useState<Client|null>(null),[showForm,setShowForm]=useState(false),[selected,setSelected]=useState<Client|null>(null);
  async function load(){
   setBusy(true);setError('');
   const [companies,customers,summary]=await Promise.all([
-   supabase.from('client_companies').select('id,name,gstin,pan,phone,email,billing_address_line1:address_line1,billing_address_line2:address_line2,billing_city:city,billing_state:state,billing_state_code:state_code,billing_postal_code:postal_code,is_active').eq('organization_id',organizationId).order('name'),
-   supabase.from('customers').select('id,name').eq('organization_id',organizationId),
+   supabase.from('client_companies').select('id,customer_id,name,gstin,pan,phone,email,billing_address_line1:address_line1,billing_address_line2:address_line2,billing_city:city,billing_state:state,billing_state_code:state_code,billing_postal_code:postal_code,is_active').eq('organization_id',organizationId).order('name'),
+   Promise.resolve({data:[],error:null} as any),
    supabase.from('customer_balance_summary').select('customer_id,total_invoiced_paise,total_paid_paise,total_pending_paise').eq('organization_id',organizationId)
   ]);
   setBusy(false);
   const failure=companies.error||customers.error||summary.error;
   if(failure){setError(failure.message);return;}
-  const customerByName=new Map((customers.data??[]).map((c:any)=>[normalize(c.name),c.id]));
   const balanceByCustomer=new Map((summary.data??[]).map((b:any)=>[b.customer_id,b as Balance]));
   const mapped=(companies.data??[]).map((company:any)=>({...company,shipping_address_line1:null,shipping_address_line2:null,shipping_city:null,shipping_state:null,shipping_state_code:null,shipping_postal_code:null})) as Client[];
   const nextBalances:Record<string,Balance>={};
-  for(const company of mapped){const customerId=customerByName.get(normalize(company.name));const balance=customerId?balanceByCustomer.get(customerId):undefined;if(balance)nextBalances[company.id]=balance;}
+  for(const company of mapped){const balance=company.customer_id?balanceByCustomer.get(company.customer_id):undefined;if(balance)nextBalances[company.id]=balance;}
   setClients(mapped);setBalances(nextBalances);
  }
  useEffect(()=>{void load()},[organizationId]);
@@ -33,18 +31,11 @@ export default function CustomersPage({supabase,organizationId,onBack}:{supabase
  async function save(form:Form){
   const values={name:form.name.trim(),gstin:form.gstin||null,pan:form.pan||null,phone:form.phone||null,email:form.email||null,address_line1:form.billing_address_line1||null,address_line2:form.billing_address_line2||null,city:form.billing_city||null,state:form.billing_state||null,state_code:form.billing_state_code||null,postal_code:form.billing_postal_code||null,is_active:true};
   if(editing){
-   const oldCustomer=await supabase.from('customers').select('id').eq('organization_id',organizationId).ilike('name',editing.name).maybeSingle();
-   if(oldCustomer.error)throw oldCustomer.error;
-   if(oldCustomer.data){const updated=await supabase.rpc('update_customer',{p_customer_id:oldCustomer.data.id,p_organization_id:organizationId,p_name:form.name,...customerArgs(form)});if(updated.error)throw updated.error;}
-   else {const created=await supabase.rpc('create_customer',{p_organization_id:organizationId,p_name:form.name,...customerArgs(form)});if(created.error)throw created.error;}
    const company=await supabase.from('client_companies').update(values).eq('id',editing.id).eq('organization_id',organizationId);
    if(company.error)throw company.error;
   }else{
-   const company=await supabase.from('client_companies').upsert({organization_id:organizationId,...values},{onConflict:'organization_id,name'}).select('id').single();
+   const company=await supabase.from('client_companies').insert({organization_id:organizationId,...values});
    if(company.error)throw company.error;
-   const customer=await supabase.from('customers').select('id').eq('organization_id',organizationId).ilike('name',form.name).maybeSingle();
-   if(customer.error)throw customer.error;
-   if(!customer.data){const created=await supabase.rpc('create_customer',{p_organization_id:organizationId,p_name:form.name,...customerArgs(form)});if(created.error)throw created.error;}
   }
   setShowForm(false);setEditing(null);await load();
  }
