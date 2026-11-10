@@ -43,10 +43,6 @@ begin
   end loop;
 end $$;
 
-create unique index if not exists uq_client_companies_customer
-  on public.client_companies(organization_id,customer_id)
-  where customer_id is not null;
-
 create or replace function public.sync_client_company_customer()
 returns trigger
 language plpgsql
