@@ -107,6 +107,11 @@ alter table public.client_bills
 create unique index if not exists uq_client_bills_invoice
   on public.client_bills(invoice_id) where invoice_id is not null;
 
+alter table public.invoices
+  add constraint invoices_client_bill_fk
+  foreign key (organization_id,client_bill_id)
+  references public.client_bills(organization_id,id) on delete restrict;
+
 create index if not exists idx_invoices_contract
   on public.invoices(organization_id,contract_id,invoice_date desc);
 
