@@ -132,3 +132,14 @@ button.secondary{border:1px solid #d6dce5;border-radius:9px;padding:10px 14px;ba
 .workspace-tabs button:hover{background:#f8fafc;color:#172033;}
 .workspace-tabs button.active{background:#172033;border-color:#172033;color:#fff;box-shadow:0 1px 2px rgba(15,23,42,.12);}
 @media(max-width:700px){.workspace-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}.workspace-tabs button{width:100%;}}
+
+/* Modern segmented navigation for the contract workspace */
+.page-tabs{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:18px 0 20px;padding:5px;background:#e9eef5;border:1px solid #dce4ef;border-radius:14px;width:max-content;max-width:100%;}
+.page-tabs .page-tab{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 18px;border:1px solid transparent;border-radius:10px;background:transparent;color:#526176;font-size:13px;font-weight:700;letter-spacing:-.01em;transition:background .16s ease,color .16s ease,box-shadow .16s ease;}
+.page-tabs .page-tab:hover{background:rgba(255,255,255,.72);color:#172033;}
+.page-tabs .page-tab.active{background:#fff;border-color:#dce4ef;color:#172033;box-shadow:0 2px 7px rgba(20,32,50,.09),0 1px 2px rgba(20,32,50,.05);}
+.invoice-deduction-section{display:grid;gap:12px;padding:16px 18px;background:#f8fafc;border:1px solid #e0e7f0;border-radius:12px;}
+.invoice-deduction-fields{display:grid;gap:12px;padding-top:2px;}
+.invoice-deduction-section .toggle-row{color:#243247;font-size:13px;}
+.invoice-deduction-section input,.invoice-deduction-section select{min-height:42px;}
+@media(max-width:700px){.page-tabs{width:100%;display:grid;grid-template-columns:1fr;}.page-tabs .page-tab{width:100%;}}
